@@ -1,7 +1,7 @@
 Package: BurdenMLEDN
 Type: Package
 Title: Maximum-Likelihood Models for De Novo Variant Burden
-Version: 0.1.0
+Version: 0.1.1
 Authors@R: person(
     given = "Ajay",
     family = "Nadig",

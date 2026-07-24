@@ -10,7 +10,9 @@
 #' @param features Optional one-hot numeric matrix assigning genes to
 #'   annotation strata. Row names and order must match `input_data`.
 #' @param component_endpoints Optional numeric vector of upper endpoints for
-#'   the uniform log-rate-ratio mixture components.
+#'   the uniform log-rate-ratio mixture components. Use
+#'   [effect_size_grid()] to construct prevalence-derived or conservatively
+#'   wide grids.
 #' @param no_cpts Number of mixture components when `component_endpoints` is
 #'   not supplied.
 #' @param grid_size Number of numerical-integration points per component.
@@ -22,7 +24,8 @@
 #' @param bootstrap_samples Optional matrix of user-supplied bootstrap row
 #'   indices.
 #' @param n_boot Number of bootstrap replicates.
-#' @param null_sim Run parametric null simulations.
+#' @param null_sim Run optional parametric null simulations. These are not
+#'   needed for estimation or bootstrap confidence intervals.
 #' @param n_null Number of null simulations.
 #' @param return_likelihood Store the maximized log likelihood.
 #' @param estimate_posteriors Compute gene-level posterior summaries.
@@ -62,10 +65,10 @@ BurdenMLE_DN <- function(input_data,
                           bootstrap = TRUE,
                           bootstrap_samples = NULL,
                           n_boot = 100,
-                          null_sim = TRUE,
+                          null_sim = FALSE,
                           n_null = 100,
                           return_likelihood = TRUE,
-                          estimate_posteriors = FALSE,
+                          estimate_posteriors = TRUE,
                           estimate_effective_penetrance = TRUE,
                           optimizer = c("mixsqp", "EM"),
                           mixsqp_control = list()) {

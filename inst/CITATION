@@ -5,6 +5,6 @@ bibentry(
   title = "BurdenMLE-DN: Maximum-Likelihood Models for De Novo Variant Burden",
   author = person("Ajay", "Nadig"),
   year = "2026",
-  note = "R package version 0.1.0",
+  note = "R package version 0.1.1",
   url = "https://github.com/ajaynadig/BurdenMLE-DN"
 )

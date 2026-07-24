@@ -15,11 +15,14 @@ for forbidden_dir in analysis/inputs analysis/outputs analysis/logs; do
     fail "restricted/generated directory exists: ${forbidden_dir}"
 done
 
-# Disallow data-bearing formats except the explicitly synthetic package file
-# and the metadata-only input manifest.
+# Disallow data-bearing formats except the explicitly synthetic example,
+# count-free public gene references, and metadata-only input manifest.
 while IFS= read -r path; do
   case "${path}" in
-    ./inst/extdata/synthetic_example.csv|./analysis/input_manifest.tsv)
+    ./inst/extdata/synthetic_example.csv|\
+    ./inst/extdata/burdenmle_gene_reference.csv|\
+    ./inst/extdata/loeuf_strata_summary.csv|\
+    ./analysis/input_manifest.tsv)
       ;;
     *)
       fail "unexpected data-like file: ${path}"
@@ -33,6 +36,12 @@ done < <(
     -iname '*.rds' -o -iname '*.rdata' -o -iname '*.rda' \
   \) -print
 )
+
+reference_header="$(head -n 1 inst/extdata/burdenmle_gene_reference.csv)"
+if printf '%s\n' "${reference_header}" |
+    grep -Eiq 'case_count|control_count|observed_count|sample_id|variant'; then
+  fail "public gene reference contains a prohibited cohort-data column"
+fi
 
 # Absolute user paths are a portability and disclosure risk.
 if rg -n '/Users/|/home/|~/Mirror/' \

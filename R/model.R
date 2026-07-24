@@ -4,7 +4,7 @@ choose_component_endpoints_trio <- function(component_endpoints,
                                             no_cpts,
                                             prevalence) {
   if (!is.null(component_endpoints)) return(component_endpoints)
-  seq(0, log(1 / prevalence), length.out = no_cpts)
+  effect_size_grid(prevalence = prevalence, no_cpts = no_cpts)
 }
 
 initialize_model <- function(likelihood_function,

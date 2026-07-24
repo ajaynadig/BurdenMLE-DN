@@ -16,20 +16,24 @@ example_file <- system.file(
   "extdata", "synthetic_example.csv", package = "BurdenMLEDN"
 )
 dat <- read.csv(example_file, row.names = "gene")
+features <- model.matrix(~ analysis_stratum - 1, dat)
+rownames(features) <- rownames(dat)
 
 fit <- BurdenMLE_DN(
   dat,
+  features = features,
   prevalence = 0.02,
-  bootstrap = FALSE,
-  null_sim = FALSE
+  bootstrap = FALSE
 )
 fit
 mixture_weights(fit)
 ```
 
-The bundled example is entirely synthetic. For uncertainty estimates, set
-`bootstrap = TRUE` and choose `n_boot`; null simulations are controlled
-separately by `null_sim` and `n_null`.
+The bundled example is entirely synthetic. Substantive analyses should usually
+include gene annotations such as LOEUF as one-hot `features`; the package also
+ships a count-free [gene reference](wiki/Input-Data-and-Model-Parameters.md#bundled-gene-reference)
+with the manuscript LOEUF strata and mutation rates. For uncertainty estimates,
+set `bootstrap = TRUE` and choose `n_boot`.
 
 ## Documentation
 

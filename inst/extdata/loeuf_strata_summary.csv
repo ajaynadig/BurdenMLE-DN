@@ -1,0 +1,7 @@
+"analysis_stratum","description","genes","loeuf_min","loeuf_max"
+"LOEUF1_mu1","Most constrained LOEUF quintile and above the global 80th percentile of corrected cumulative coding SNV mutation rate",1544,0.03,0.422
+"LOEUF1_mu2","Most constrained LOEUF quintile and at or below the global 80th percentile of corrected cumulative coding SNV mutation rate",2007,0.051,0.422
+"LOEUF2","Second LOEUF quintile",3539,0.423,0.741
+"LOEUF3","Third LOEUF quintile",3530,0.742,1.055
+"LOEUF4","Fourth LOEUF quintile",3480,1.056,1.438
+"LOEUF5","Least constrained LOEUF quintile",3295,1.439,1.995

@@ -18,10 +18,10 @@ BurdenMLE_DN(
   bootstrap = TRUE,
   bootstrap_samples = NULL,
   n_boot = 100,
-  null_sim = TRUE,
+  null_sim = FALSE,
   n_null = 100,
   return_likelihood = TRUE,
-  estimate_posteriors = FALSE,
+  estimate_posteriors = TRUE,
   estimate_effective_penetrance = TRUE,
   optimizer = c("mixsqp", "EM"),
   mixsqp_control = list()
@@ -36,7 +36,9 @@ the repository's "Worked example" page.}
 annotation strata. Row names and order must match \code{input_data}.}
 
 \item{component_endpoints}{Optional numeric vector of upper endpoints for
-the uniform log-rate-ratio mixture components.}
+the uniform log-rate-ratio mixture components. Use
+\code{\link[=effect_size_grid]{effect_size_grid()}} to construct prevalence-derived or conservatively
+wide grids.}
 
 \item{no_cpts}{Number of mixture components when \code{component_endpoints} is
 not supplied.}
@@ -57,7 +59,8 @@ indices.}
 
 \item{n_boot}{Number of bootstrap replicates.}
 
-\item{null_sim}{Run parametric null simulations.}
+\item{null_sim}{Run optional parametric null simulations. These are not
+needed for estimation or bootstrap confidence intervals.}
 
 \item{n_null}{Number of null simulations.}
 
