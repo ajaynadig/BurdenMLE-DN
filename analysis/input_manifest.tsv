@@ -1,0 +1,11 @@
+directory	contents	availability
+inputs/autism/variants	Autism de novo variant tables	Restricted or embargoed; obtain from originating study authors
+inputs/autism/gene_counts	Autism gene-level count tables	Restricted or embargoed; obtain from originating study authors
+inputs/autism/pedigrees	Autism pedigree and phenotype tables	Restricted or embargoed; obtain from originating study authors
+inputs/developmental_disorder	Developmental-disorder count and sample metadata	Obtain from the cited study or originating authors
+inputs/korean_wgs	Korean autism WGS inputs	Obtain from the cited study or originating authors
+inputs/mutation_rates	Gene-level mutation-rate resources	Obtain from the resources cited in the manuscript
+inputs/constraint	gnomAD constraint resources	Publicly available from gnomAD
+inputs/reference	Published gene-set and comparison resources	Obtain from the cited publications or supplements
+inputs/demographics	CDC paternal-age resources	Publicly available from CDC/NCHS
+inputs/age_phenotypes	Authorized age-at-diagnosis phenotype files	Restricted; obtain from the originating study

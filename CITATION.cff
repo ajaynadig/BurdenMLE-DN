@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use BurdenMLE-DN, please cite this software and the associated manuscript."
+title: "BurdenMLE-DN"
+type: software
+authors:
+  - family-names: Nadig
+    given-names: Ajay
+    email: anadig@broadinstitute.org
+repository-code: "https://github.com/ajaynadig/BurdenMLE-DN"
+license: MIT
+version: 0.1.0
+date-released: 2026-07-24

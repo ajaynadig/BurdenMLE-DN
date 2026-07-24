@@ -1,0 +1,27 @@
+Package: BurdenMLEDN
+Type: Package
+Title: Maximum-Likelihood Models for De Novo Variant Burden
+Version: 0.1.0
+Authors@R: person(
+    given = "Ajay",
+    family = "Nadig",
+    email = "anadig@broadinstitute.org",
+    role = c("aut", "cre")
+  )
+Description: Fits discrete-mixture maximum-likelihood models to gene-level
+    de novo variant counts. The fitted distribution of gene-level rate ratios
+    supports estimation of mutational variance, effective penetrance, and
+    related burden summaries.
+License: MIT + file LICENSE
+URL: https://github.com/ajaynadig/BurdenMLE-DN
+BugReports: https://github.com/ajaynadig/BurdenMLE-DN/issues
+Depends:
+    R (>= 4.2.0)
+Imports:
+    mixsqp,
+    pbapply,
+    stats,
+    utils
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.0

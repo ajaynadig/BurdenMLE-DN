@@ -1,0 +1,9 @@
+^\.github$
+^\.gitignore$
+^analysis$
+^data-raw$
+^tools$
+^wiki$
+^LICENSE\.md$
+^CITATION\.cff$
+^README\.Rmd$

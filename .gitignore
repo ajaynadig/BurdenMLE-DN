@@ -1,0 +1,23 @@
+.DS_Store
+.Rhistory
+.RData
+.Rproj.user/
+*.Rcheck/
+*.tar.gz
+
+# Restricted manuscript inputs and generated outputs are never versioned.
+analysis/inputs/
+analysis/outputs/
+analysis/logs/
+
+# Common count- and variant-table formats.
+*.vcf
+*.vcf.gz
+*.bcf
+*.bed
+*.bed.gz
+*.bgz
+*.rds
+*.RDS
+*.RData
+*.rda
