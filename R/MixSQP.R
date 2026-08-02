@@ -56,8 +56,6 @@ MixSQP_fit <- function(model,
   no_strata <- ncol(features)
   delta <- matrix(NA_real_, nrow = no_strata, ncol = no_cpts)
   fits <- vector("list", no_strata)
-  total_ll <- 0
-
   for (stratum in seq_len(no_strata)) {
     in_stratum <- features[, stratum] == 1
     if (!any(in_stratum)) {
@@ -85,13 +83,12 @@ MixSQP_fit <- function(model,
       )
     }
     delta[stratum, ] <- fits[[stratum]]$x
-    total_ll <- total_ll + sum(log(drop(likelihood %*% fits[[stratum]]$x)))
   }
 
   dimnames(delta) <- dimnames(model$delta)
   model$delta <- delta
   if (return_likelihood) {
-    model$ll <- total_ll
+    model$ll <- absolute_mixture_log_likelihood(model)
   }
   model$mixsqp_output <- fits
   model
@@ -118,8 +115,7 @@ bootstrap_MixSQP <- function(model,
   bootstrap_delta <- pblapply(seq_len(n_boot), function(iter) {
     model_boot <- model
     sample_indices <- bootstrap_samples[, iter]
-    model_boot$conditional_likelihood <-
-      model_boot$conditional_likelihood[sample_indices, , drop = FALSE]
+    model_boot <- subset_model_likelihood_rows(model_boot, sample_indices)
     model_boot$features <- model_boot$features[sample_indices, , drop = FALSE]
     # Begin every resampled fit from the same neutral, strictly positive state
     # as the full-data fit so that zero full-data weights can re-enter.
