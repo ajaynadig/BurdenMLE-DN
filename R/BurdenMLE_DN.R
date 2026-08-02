@@ -169,8 +169,11 @@ BurdenMLE_DN <- function(input_data,
 
 
 
-                                                model_boot = model
-                                                model_boot$conditional_likelihood = model_boot$conditional_likelihood[model$bootstrap_output$bootstrap_samples[,iter],]
+                                                sample_indices = model$bootstrap_output$bootstrap_samples[,iter]
+                                                model_boot = subset_model_likelihood_rows(
+                                                  model,
+                                                  sample_indices
+                                                )
                                                 model_boot$features = model_boot$features[model$bootstrap_output$bootstrap_samples[,iter],]
                                                 model_boot$delta = model$bootstrap_output$bootstrap_delta[[iter]]
 
@@ -300,12 +303,14 @@ BurdenMLE_DN <- function(input_data,
       cat("...bootstrap effective penetrance")
       bootstrap_peneff_ests = pbsapply(1:length(model$bootstrap_output$bootstrap_delta),
                                      function(iter) {
-                                       model_boot = model
-                                       model_boot$conditional_likelihood = model_boot$conditional_likelihood[model$bootstrap_output$bootstrap_samples[,iter],]
+                                       sample_indices = model$bootstrap_output$bootstrap_samples[,iter]
+                                       model_boot = subset_model_likelihood_rows(
+                                         model,
+                                         sample_indices
+                                       )
                                        model_boot$features = model_boot$features[model$bootstrap_output$bootstrap_samples[,iter],]
                                        model_boot$delta = model$bootstrap_output$bootstrap_delta[[iter]]
 
-                                       sample_indices = model$bootstrap_output$bootstrap_samples[,iter]
                                        moments_boot = list(
                                          numerator = penetrance_moments$numerator[sample_indices, , drop = FALSE],
                                          denominator = penetrance_moments$denominator[sample_indices, , drop = FALSE]

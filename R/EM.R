@@ -11,7 +11,7 @@ EM_fit <- function(model,
   #first iteration
   weights <- model$features %*% model$delta
   posteriors <- weights * model$conditional_likelihood
-  ll[1] = sum(log(rowSums(posteriors)))
+  ll[1] = absolute_mixture_log_likelihood(model)
   posteriors <- posteriors / rowSums(posteriors)
   model$delta <- OLS_denom_t_features %*% posteriors
 
@@ -25,7 +25,7 @@ EM_fit <- function(model,
     weights <- model$features %*% model$delta
     posteriors <- weights * model$conditional_likelihood
 
-    ll[iter_count + 1] = sum(log(rowSums(posteriors)))
+    ll[iter_count + 1] = absolute_mixture_log_likelihood(model)
     ll_change = abs(ll[iter_count+1]-ll[iter_count])/abs(ll[iter_count])
 
 
@@ -68,7 +68,10 @@ bootstrap_EM <- function(model,
                             function(iter) {
 
                               model_boot = model
-                              model_boot$conditional_likelihood = model_boot$conditional_likelihood[bootstrap_samples[,iter], , drop = FALSE]
+                              model_boot <- subset_model_likelihood_rows(
+                                model_boot,
+                                bootstrap_samples[, iter]
+                              )
                               model_boot$features = model_boot$features[bootstrap_samples[,iter], , drop = FALSE]
 
                               boot_output <- EM_fit(model = model_boot, max_iter = max_iter, tol)
