@@ -53,7 +53,7 @@ mutvar_constant <- function(model, genetic_data) {
 }
 bootstrap_constants <- function(model, genetic_data) {
   vapply(seq_along(model$bootstrap_output$bootstrap_delta), function(iteration) {
-    indices <- model$bootstrap_output$bootstrap_samples[, iteration]
+    indices <- model$bootstrap_output$bootstrap_indices[, iteration]
     boot_model <- model
     boot_model$features <- model$features[indices, , drop = FALSE]
     boot_model$delta <- model$bootstrap_output$bootstrap_delta[[iteration]]

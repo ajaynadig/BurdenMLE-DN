@@ -111,7 +111,7 @@ extract_results <- function(models, model_names, prevalence_factors,
         variant_class = variant_class,
         role = role,
         optimizer = method,
-        log_likelihood = last_finite(model$ll),
+        log_likelihood = model$fit_status$log_likelihood,
         mutational_variance =
           as.numeric(model$mutvar_output$total_mutvar) * mutvar_scale,
         mutational_variance_lower =

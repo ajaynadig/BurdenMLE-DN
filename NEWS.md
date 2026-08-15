@@ -1,5 +1,11 @@
 # BurdenMLEDN 0.1.1
 
+- Standardized full, bootstrap, and null fit status across MixSQP and EM;
+  uncertainty now distinguishes usable nonconvergence from unusable fits.
+- Made bootstrap samples gene-identified and added independent, replayable
+  bootstrap and null seeds without changing caller RNG state.
+- Made bootstrap reconstruction and confidence-interval shapes robust for
+  one or many annotation strata and replicates.
 - Disabled optional null simulations by default and enabled gene posterior
   summaries by default, matching routine substantive use.
 - Added helpers for prevalence-derived and conservatively wide effect grids.

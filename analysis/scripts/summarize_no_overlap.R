@@ -74,7 +74,7 @@ threshold_summary <- function(model, genetic_data) {
   )
 }
 bootstrap_model <- function(model, genetic_data, iteration) {
-  indices <- model$bootstrap_output$bootstrap_samples[, iteration]
+  indices <- model$bootstrap_output$bootstrap_indices[, iteration]
   boot <- model
   boot$conditional_likelihood <- model$conditional_likelihood[indices, , drop = FALSE]
   boot$features <- model$features[indices, , drop = FALSE]

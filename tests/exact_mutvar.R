@@ -191,9 +191,9 @@ fit_features <- matrix(
   dimnames = list(rownames(fit_data), c("low", "high"))
 )
 bootstrap_samples <- cbind(
-  seq_len(8),
-  rev(seq_len(8)),
-  c(1, 1, 2, 3, 5, 6, 7, 8)
+  rownames(fit_data),
+  rev(rownames(fit_data)),
+  rownames(fit_data)[c(1, 1, 2, 3, 5, 6, 7, 8)]
 )
 fit_args <- list(
   input_data = fit_data,
@@ -208,8 +208,8 @@ fit_args <- list(
   estimate_posteriors = FALSE,
   estimate_effective_penetrance = FALSE,
   optimizer = "EM",
-  max_iter = 200,
-  max_iter_boot = 200,
+  max_iter = 10000,
+  max_iter_boot = 10000,
   tol = 1e-10
 )
 quiet_fit <- function(seed) {
@@ -221,10 +221,10 @@ quiet_fit <- function(seed) {
 fit_one <- quiet_fit(1)
 fit_two <- quiet_fit(9876)
 frozen_main_delta <- structure(c(
-  1.47749453399884e-06, 7.04600577078912e-25,
-  0.888989988317672, 1.92467486032459e-17,
-  0.111008534187794, 0.625124244673556,
-  7.55552288009259e-17, 0.374875755326444
+  8.37904064100953e-105, 9.88131291682493e-324,
+  0.989016361170575, 2.48082828847263e-271,
+  0.0109836388294251, 0.63437131774482,
+  1.0771418585496e-242, 0.36562868225518
 ), dim = c(2L, 4L))
 stopifnot(
   isTRUE(all.equal(

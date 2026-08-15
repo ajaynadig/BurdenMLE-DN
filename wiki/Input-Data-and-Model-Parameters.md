@@ -53,8 +53,9 @@ must contain a gene. The same contract applies to MixSQP and EM. Omitting
 | `no_cpts` | Number of mixture components | 10 |
 | `component_endpoints` | Optional finite, unique, strictly increasing upper endpoints on the log-rate-ratio scale; takes precedence over `no_cpts` | prevalence-dependent grid |
 | `grid_size` | Integration points per uniform component | 10 |
-| `bootstrap`, `n_boot` | Gene-level nonparametric bootstrap and replicate count | `TRUE`, 100 |
-| `null_sim`, `n_null` | Optional parametric null simulation and replicate count | `FALSE`, 100 when enabled |
+| `bootstrap`, `n_boot`, `bootstrap_seed` | Gene-level nonparametric bootstrap, replicate count, and seed | `TRUE`, 100, 1 |
+| `bootstrap_samples` | Optional character matrix of sampled gene IDs | generated |
+| `null_sim`, `n_null`, `null_seed` | Optional parametric null simulation, replicate count, and seed | `FALSE`, 100, 1 |
 | `estimate_posteriors` | Gene-level posterior summaries | `TRUE` |
 | `optimizer` | Mixture optimizer | `"mixsqp"` |
 | `mixsqp_control` | Overrides passed to `mixsqp::mixsqp()` | package defaults |
@@ -62,6 +63,17 @@ must contain a gene. The same contract applies to MixSQP and EM. Omitting
 The MixSQP defaults use no preliminary iterations, retain numerically small
 components (`zero.threshold.solution = 0`), and set the active-set iteration
 allowance to `max(20, 2 * number_of_components)`.
+
+`bootstrap_samples` has one input-gene draw per row and one replicate per
+column. Replacement draws are allowed. Values must be gene row names from the
+current input; numeric row positions are rejected. Optional column names must
+be unique and nonempty and become replicate identifiers. This representation
+preserves the sampled genes when an otherwise identical input is reordered.
+
+Generated bootstrap samples and null datasets use independent,
+replicate-specific seeds beginning at `bootstrap_seed` and `null_seed`.
+Resampling restores the caller's RNG state. Supplied `bootstrap_samples` take
+precedence over `bootstrap_seed` and consume no bootstrap randomness.
 
 ## Choosing the effect-size grid
 
@@ -122,5 +134,5 @@ procedure for their own calling pipeline.
 | Optimizer | MixSQP | MixSQP |
 | Components / integration grid | 10 / 10 | 10 / 10 |
 
-The main models also reused identical bootstrap resampling indices across
-related fits to make comparisons less sensitive to Monte Carlo variation.
+The main models also reused identical gene-ID bootstrap samples across related
+fits to make comparisons less sensitive to Monte Carlo variation.

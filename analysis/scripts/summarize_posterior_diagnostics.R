@@ -115,7 +115,7 @@ n_boot <- length(ptv_model$bootstrap_output$bootstrap_delta)
 mean_cds_boot <- matrix(NA_real_, length(thresholds), n_boot)
 progress <- txtProgressBar(min = 0, max = n_boot, style = 3)
 for (iteration in seq_len(n_boot)) {
-  sample_indices <- ptv_model$bootstrap_output$bootstrap_samples[, iteration]
+  sample_indices <- ptv_model$bootstrap_output$bootstrap_indices[, iteration]
   boot_model <- ptv_model
   boot_model$conditional_likelihood <- ptv_model$conditional_likelihood[sample_indices, , drop = FALSE]
   boot_model$features <- ptv_model$features[sample_indices, , drop = FALSE]

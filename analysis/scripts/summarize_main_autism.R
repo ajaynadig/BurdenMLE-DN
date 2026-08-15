@@ -198,7 +198,7 @@ posterior_summaries <- function(model, genetic_data, thresholds) {
 }
 
 bootstrap_model <- function(model, genetic_data, iteration) {
-  sample_indices <- model$bootstrap_output$bootstrap_samples[, iteration]
+  sample_indices <- model$bootstrap_output$bootstrap_indices[, iteration]
   model_boot <- model
   model_boot$conditional_likelihood <-
     model$conditional_likelihood[sample_indices, , drop = FALSE]

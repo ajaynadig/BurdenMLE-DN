@@ -60,7 +60,7 @@ fraction_cases <- function(model, genetic_data, threshold = 5) {
   sum(2 * genetic_data$case_rate * as.vector(grid$probability %*% integrand))
 }
 bootstrap_model <- function(model, genetic_data, iteration) {
-  sample_indices <- model$bootstrap_output$bootstrap_samples[, iteration]
+  sample_indices <- model$bootstrap_output$bootstrap_indices[, iteration]
   model_boot <- model
   model_boot$conditional_likelihood <- model$conditional_likelihood[sample_indices, , drop = FALSE]
   model_boot$features <- model$features[sample_indices, , drop = FALSE]

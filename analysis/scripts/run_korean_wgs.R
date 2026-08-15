@@ -318,8 +318,12 @@ fit_inputs <- lapply(seq_len(nrow(classes)), function(i) {
 names(fit_inputs) <- classes$class
 
 set.seed(opt$seed)
-bootstrap_samples <- replicate(
-  opt$n_boot, sample.int(nrow(gene), replace = TRUE)
+bootstrap_samples <- matrix(
+  replicate(
+    opt$n_boot, gene$gene_id[sample.int(nrow(gene), replace = TRUE)]
+  ),
+  nrow = nrow(gene),
+  ncol = opt$n_boot
 )
 message(
   "Fitting PTV, pooled-missense, and synonymous BurdenMLE-DN models with ",
@@ -344,22 +348,13 @@ fits <- lapply(seq_len(nrow(classes)), function(i) {
 })
 names(fits) <- classes$class
 
-all_converged <- vapply(fits, function(model) {
-  full_converged <- all(vapply(
-    model$mixsqp_output,
-    function(x) identical(x$status, "converged to optimal solution"),
-    logical(1)
-  ))
-  full_converged && all(vapply(
-    model$bootstrap_output$bootstrap_delta,
-    function(x) all(is.finite(x)),
-    logical(1)
-  ))
+all_reliable <- vapply(fits, function(model) {
+  isTRUE(model$uncertainty_reliable)
 }, logical(1))
-if (!all(all_converged)) {
-  stop(
-    "At least one Korean WGS model or bootstrap fit failed: ",
-    paste(names(all_converged)[!all_converged], collapse = ", ")
+if (!all(all_reliable)) {
+  warning(
+    "At least one Korean WGS model retained usable nonconverged bootstrap ",
+    "fits: ", paste(names(all_reliable)[!all_reliable], collapse = ", ")
   )
 }
 
@@ -402,7 +397,9 @@ results <- data.frame(
   mutvar_ci_upper = ci[, 2],
   ptv_indel_scale = reported_scale,
   prevalence = prevalence,
-  log_likelihood = vapply(fits, function(x) x$ll, numeric(1)),
+  log_likelihood = vapply(
+    fits, function(x) x$fit_status$log_likelihood, numeric(1)
+  ),
   active_components_min = vapply(
     fits, function(x) min(rowSums(x$delta > 1e-8)), numeric(1)
   ),

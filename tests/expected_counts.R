@@ -53,10 +53,10 @@ weight_references <- list(
     1.83356293844075e-15, 0.365628684676862
   ), dim = c(2L, 4L)),
   EM = structure(c(
-    1.47749453399884e-06, 7.04600577078912e-25,
-    0.888989988317672, 1.92467486032459e-17,
-    0.111008534187794, 0.625124244673556,
-    7.55552288009259e-17, 0.374875755326444
+    8.37904064100953e-105, 9.88131291682493e-324,
+    0.989016361170575, 2.48082828847263e-271,
+    0.0109836388294251, 0.63437131774482,
+    1.0771418585496e-242, 0.36562868225518
   ), dim = c(2L, 4L))
 )
 
@@ -64,7 +64,7 @@ for (optimizer in c("mixsqp", "EM")) {
   raw_args <- base_args
   raw_args$input_data <- raw_data
   raw_args$optimizer <- optimizer
-  raw_args$max_iter <- 200
+  raw_args$max_iter <- 10000
   raw_args$tol <- 1e-10
   raw_fit <- quiet_fit(raw_args)
 
@@ -170,7 +170,7 @@ rate_args$input_data <- expected_with_rate
 rate_args$optimizer <- "EM"
 rate_args$mutvar_est <- TRUE
 rate_args$estimate_posteriors <- FALSE
-rate_args$max_iter <- 200
+rate_args$max_iter <- 10000
 rate_args$tol <- 1e-10
 set.seed(20260815)
 rate_fit <- quiet_fit(rate_args)
@@ -201,7 +201,7 @@ capability_args$optimizer <- "EM"
 capability_args$null_sim <- TRUE
 capability_args$n_null <- 2
 capability_args$estimate_effective_penetrance <- TRUE
-capability_args$max_iter <- 100
+capability_args$max_iter <- 10000
 capability_args$tol <- 1e-10
 set.seed(7)
 capability_fit <- quiet_fit(capability_args)

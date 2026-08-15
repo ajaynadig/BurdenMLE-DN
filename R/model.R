@@ -154,6 +154,185 @@ subset_model_likelihood_rows <- function(model, rows) {
   model
 }
 
+validate_positive_integer <- function(value, name) {
+  if (length(value) != 1L || !is.numeric(value) || is.na(value) ||
+      !is.finite(value) || value < 1 || value != as.integer(value)) {
+    stop(name, " must be one positive integer.")
+  }
+  as.integer(value)
+}
+
+resampling_seeds <- function(seed, replicates, name, prefix) {
+  seed <- validate_positive_integer(seed, name)
+  if (as.double(seed) + as.double(replicates) - 1 > .Machine$integer.max) {
+    stop(name, " is too large to derive one seed per replicate.")
+  }
+  seeds <- as.integer(as.double(seed) + seq_len(replicates) - 1)
+  names(seeds) <- paste0(prefix, seq_len(replicates))
+  seeds
+}
+
+with_local_seed <- function(seed, code) {
+  had_seed <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+  if (had_seed) old_seed <- get(".Random.seed", envir = .GlobalEnv)
+  on.exit({
+    if (had_seed) {
+      assign(".Random.seed", old_seed, envir = .GlobalEnv)
+    } else if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+      rm(".Random.seed", envir = .GlobalEnv)
+    }
+  }, add = TRUE)
+  set.seed(seed)
+  force(code)
+}
+
+prepare_bootstrap_samples <- function(gene_ids,
+                                      n_boot,
+                                      bootstrap_samples,
+                                      bootstrap_seed) {
+  n_boot <- validate_positive_integer(n_boot, "n_boot")
+  no_genes <- length(gene_ids)
+  replicate_ids <- paste0("bootstrap_", seq_len(n_boot))
+
+  if (is.null(bootstrap_samples)) {
+    replicate_seeds <- resampling_seeds(
+      bootstrap_seed, n_boot, "bootstrap_seed", "bootstrap_"
+    )
+    bootstrap_indices <- vapply(replicate_seeds, function(seed) {
+      with_local_seed(seed, sample.int(no_genes, replace = TRUE))
+    }, integer(no_genes))
+    bootstrap_samples <- matrix(
+      gene_ids[bootstrap_indices], nrow = no_genes, ncol = n_boot
+    )
+    source <- "generated"
+  } else {
+    if (!is.matrix(bootstrap_samples) || !is.character(bootstrap_samples)) {
+      stop(
+        "bootstrap_samples must be a character matrix of sampled gene IDs; ",
+        "numeric row positions are no longer accepted."
+      )
+    }
+    if (!identical(dim(bootstrap_samples), c(no_genes, n_boot))) {
+      stop(
+        "bootstrap_samples must have exactly one row per input gene and ",
+        "n_boot columns."
+      )
+    }
+    if (anyNA(bootstrap_samples) || any(bootstrap_samples == "")) {
+      stop("bootstrap_samples must contain non-missing, nonempty gene IDs.")
+    }
+    unknown <- unique(bootstrap_samples[!bootstrap_samples %in% gene_ids])
+    if (length(unknown) > 0L) {
+      stop(
+        "bootstrap_samples contains gene IDs absent from input_data: ",
+        paste(utils::head(unknown, 5L), collapse = ", "), "."
+      )
+    }
+    supplied_ids <- colnames(bootstrap_samples)
+    if (!is.null(supplied_ids)) {
+      if (anyNA(supplied_ids) || any(supplied_ids == "") ||
+          anyDuplicated(supplied_ids)) {
+        stop(
+          "bootstrap_samples column names must be unique, nonempty, and ",
+          "non-missing when supplied."
+        )
+      }
+      replicate_ids <- supplied_ids
+    }
+    bootstrap_indices <- matrix(
+      match(bootstrap_samples, gene_ids), nrow = no_genes, ncol = n_boot
+    )
+    replicate_seeds <- rep(NA_integer_, n_boot)
+    source <- "supplied"
+  }
+
+  dimnames(bootstrap_samples) <- list(NULL, replicate_ids)
+  dimnames(bootstrap_indices) <- list(NULL, replicate_ids)
+  names(replicate_seeds) <- replicate_ids
+  list(
+    samples = bootstrap_samples,
+    indices = bootstrap_indices,
+    replicate_ids = replicate_ids,
+    seeds = replicate_seeds,
+    source = source
+  )
+}
+
+mixture_weights_are_valid <- function(weights, tolerance = 1e-8) {
+  is.matrix(weights) && is.numeric(weights) &&
+    !anyNA(weights) && all(is.finite(weights)) &&
+    all(weights >= 0) &&
+    all(abs(rowSums(weights) - 1) <= tolerance)
+}
+
+new_fit_status <- function(optimizer,
+                           weights,
+                           log_likelihood,
+                           converged,
+                           backend_message,
+                           iterations = NA_integer_) {
+  likelihood_valid <- length(log_likelihood) == 1L &&
+    is.numeric(log_likelihood) && !is.na(log_likelihood) &&
+    is.finite(log_likelihood)
+  weights_valid <- mixture_weights_are_valid(weights)
+  usable <- likelihood_valid && weights_valid
+  code <- if (!weights_valid) {
+    "invalid_weights"
+  } else if (!likelihood_valid) {
+    "nonfinite_likelihood"
+  } else if (isTRUE(converged)) {
+    "converged"
+  } else {
+    "nonconverged"
+  }
+  list(
+    optimizer = optimizer,
+    log_likelihood = as.numeric(log_likelihood)[1L],
+    weights = weights,
+    converged = isTRUE(converged),
+    usable = usable,
+    code = code,
+    backend_message = backend_message,
+    iterations = as.integer(iterations)[1L]
+  )
+}
+
+assess_uncertainty_fits <- function(fit_status, stage) {
+  unusable <- names(fit_status)[
+    !vapply(fit_status, function(record) isTRUE(record$usable), logical(1))
+  ]
+  if (length(unusable) > 0L) {
+    stop(
+      stage, " produced unusable replicate fits: ",
+      paste(unusable, collapse = ", "), "."
+    )
+  }
+  nonconverged <- names(fit_status)[
+    !vapply(fit_status, function(record) isTRUE(record$converged), logical(1))
+  ]
+  if (length(nonconverged) > 0L) {
+    warning(
+      stage, " retained usable nonconverged replicate fits: ",
+      paste(nonconverged, collapse = ", "), "."
+    )
+    return(FALSE)
+  }
+  TRUE
+}
+
+reconstruct_bootstrap_replicate <- function(model, genetic_data, iteration) {
+  indices <- model$bootstrap_output$bootstrap_indices[, iteration]
+  model_boot <- subset_model_likelihood_rows(model, indices)
+  model_boot$features <- model$features[indices, , drop = FALSE]
+  model_boot$delta <- model$bootstrap_output$bootstrap_delta[[iteration]]
+  genetic_data_boot <- genetic_data[indices, , drop = FALSE]
+  list(
+    model = model_boot,
+    genetic_data = genetic_data_boot,
+    indices = indices
+  )
+}
+
 posterior_expectation <- function(model,
                                   genetic_data,
                                   function_to_integrate,

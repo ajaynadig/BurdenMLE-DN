@@ -141,7 +141,7 @@ negative_args$component_endpoints <- negative_endpoints
 negative_fit <- quiet_fit(negative_args)
 stopifnot(identical(negative_fit$component_endpoints, negative_endpoints))
 
-# Frozen references from unchanged main before contract/name changes.
+# Frozen references for converged fits under the shared status contract.
 weight_references <- list(
   mixsqp = structure(c(
     1.91855486395595e-15, 1.38856075487069e-15,
@@ -150,14 +150,14 @@ weight_references <- list(
     1.83356293844075e-15, 0.365628684676862
   ), dim = c(2L, 4L)),
   EM = structure(c(
-    1.47749453399884e-06, 7.04600577078912e-25,
-    0.888989988317672, 1.92467486032459e-17,
-    0.111008534187794, 0.625124244673556,
-    7.55552288009259e-17, 0.374875755326444
+    8.37904064100953e-105, 9.88131291682493e-324,
+    0.989016361170575, 2.48082828847263e-271,
+    0.0109836388294251, 0.63437131774482,
+    1.0771418585496e-242, 0.36562868225518
   ), dim = c(2L, 4L))
 )
 
-bootstrap_samples <- matrix(rep(seq_len(nrow(dat)), 2), ncol = 2)
+bootstrap_samples <- matrix(rep(rownames(dat), 2), ncol = 2)
 processed_dat <- BurdenMLEDN:::process_data_trio(dat)
 for (optimizer in c("mixsqp", "EM")) {
   args <- base_args
@@ -168,7 +168,7 @@ for (optimizer in c("mixsqp", "EM")) {
   args$null_sim <- TRUE
   args$n_null <- 2
   args$mutvar_est <- TRUE
-  args$max_iter <- 200
+  args$max_iter <- 10000
   args$max_iter_boot <- 200
   args$tol <- 1e-10
   set.seed(20260815)

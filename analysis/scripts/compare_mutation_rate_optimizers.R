@@ -86,9 +86,9 @@ weight_comparison <- data.frame(
   mixsqp_weight = drop(mixsqp$fit$delta)
 )
 
-em_ll <- tail(em$fit$ll[is.finite(em$fit$ll)], 1)
-mixsqp_ll <- as.numeric(mixsqp$fit$ll)
-tight_em_ll <- tail(em_tight$fit$ll[is.finite(em_tight$fit$ll)], 1)
+em_ll <- em$fit$fit_status$log_likelihood
+mixsqp_ll <- mixsqp$fit$fit_status$log_likelihood
+tight_em_ll <- em_tight$fit$fit_status$log_likelihood
 diagnostics <- data.frame(
   metric = c(
     "genes", "EM log likelihood", "MixSQP log likelihood",
@@ -106,8 +106,9 @@ diagnostics <- data.frame(
     max(abs(posterior_comparison$difference)),
     median(abs(posterior_comparison$difference)),
     cor(posterior_comparison$em_factor, posterior_comparison$mixsqp_factor),
-    sum(is.finite(em$fit$ll)), em$elapsed, mixsqp$elapsed,
-    tight_em_ll, mixsqp_ll - tight_em_ll, sum(is.finite(em_tight$fit$ll)),
+    em$fit$fit_status$iterations, em$elapsed, mixsqp$elapsed,
+    tight_em_ll, mixsqp_ll - tight_em_ll,
+    em_tight$fit$fit_status$iterations,
     max(abs(posterior_comparison$mixsqp_tight_em_difference)),
     median(abs(posterior_comparison$mixsqp_tight_em_difference)),
     cor(posterior_comparison$mixsqp_factor, posterior_comparison$tight_em_factor)
