@@ -29,8 +29,10 @@ BurdenMLE_DN(
 }
 \arguments{
 \item{input_data}{A data frame with at least two genes; explicit, unique,
-nonempty, non-missing gene row names; and columns \code{case_count}, \code{case_rate},
-and \code{N}. See the repository's "Worked example" page.}
+nonempty, non-missing gene row names; and either columns \code{case_count} and
+\code{expected_count}, or columns \code{case_count}, \code{case_rate}, and \code{N}. Supplied
+expected counts are retained exactly. See the repository's "Worked
+example" page.}
 
 \item{features}{Optional finite one-hot numeric matrix assigning genes to
 nonempty annotation strata. It must have explicit, unique, nonempty,
@@ -49,12 +51,16 @@ not supplied.}
 
 \item{grid_size}{Number of numerical-integration points per component.}
 
-\item{mutvar_est}{Compute mutational variance and annotation summaries.}
+\item{mutvar_est}{Compute mutational variance and annotation summaries.
+This requires \code{case_rate}; expected-count-only inputs must set this to
+\code{FALSE}.}
 
 \item{max_iter, max_iter_boot, tol}{Controls retained for the optional legacy
 optimizer.}
 
-\item{prevalence}{Population prevalence on the 0--1 scale.}
+\item{prevalence}{Population prevalence on the 0--1 scale. Required when
+component endpoints are generated, mutational variance is requested, or
+effective penetrance is requested; otherwise it may be \code{NULL}.}
 
 \item{bootstrap}{Run a gene-level nonparametric bootstrap.}
 
@@ -83,14 +89,16 @@ the requested component grid.}
 \value{
 An object of class \code{BurdenMLEDN_fit}. Important fields include
 \code{delta}, \code{component_endpoints}, \code{ll}, \code{mutvar_output}, \code{penetrance},
-\code{bootstrap_output}, and \code{optimizer_elapsed}. Stratum-indexed weights,
-mutational-variance summaries, and confidence intervals retain the
-feature-column names.
+\code{bootstrap_output}, \code{input_summary}, and \code{optimizer_elapsed}.
+\code{input_summary$sample_size} is \code{NA} when \code{N} was not supplied, and
+\code{input_summary$case_rate_available} reports whether mutation-rate-dependent
+estimands are supported. Stratum-indexed weights, mutational-variance
+summaries, and confidence intervals retain the feature-column names.
 }
 \description{
 Fits a discrete-mixture model to gene-level de novo variant counts using
-MixSQP. The input contains one row per gene and, at minimum, observed case
-counts and gene-specific mutation rates.
+MixSQP. The input contains one row per gene, observed case counts, and either
+exact expected counts or the mutation-rate inputs needed to derive them.
 }
 \examples{
 example_file <- system.file("extdata", "synthetic_example.csv",

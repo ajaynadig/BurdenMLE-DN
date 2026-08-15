@@ -481,6 +481,7 @@ gnomad_input_df <- data.frame(case_count = gnomad_information$syn.obs[gnomad_inf
                               expected_count = gnomad_information$syn.exp[gnomad_information$canonical == "true"& grepl("ENSG",gnomad_information$gene_id)],
                               gene_id = gnomad_information$gene_id[gnomad_information$canonical == "true"& grepl("ENSG",gnomad_information$gene_id)])
 gnomad_input_df = gnomad_input_df[complete.cases(gnomad_input_df),]
+rownames(gnomad_input_df) <- gnomad_input_df$gene_id
 
 mut_calibration_syn <- BurdenMLE_DN(gnomad_input_df,
                                      features = NULL,

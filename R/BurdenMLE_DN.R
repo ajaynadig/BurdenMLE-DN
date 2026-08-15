@@ -1,12 +1,14 @@
 #' Fit a BurdenMLE-DN model
 #'
 #' Fits a discrete-mixture model to gene-level de novo variant counts using
-#' MixSQP. The input contains one row per gene and, at minimum, observed case
-#' counts and gene-specific mutation rates.
+#' MixSQP. The input contains one row per gene, observed case counts, and either
+#' exact expected counts or the mutation-rate inputs needed to derive them.
 #'
 #' @param input_data A data frame with at least two genes; explicit, unique,
-#'   nonempty, non-missing gene row names; and columns `case_count`, `case_rate`,
-#'   and `N`. See the repository's "Worked example" page.
+#'   nonempty, non-missing gene row names; and either columns `case_count` and
+#'   `expected_count`, or columns `case_count`, `case_rate`, and `N`. Supplied
+#'   expected counts are retained exactly. See the repository's "Worked
+#'   example" page.
 #' @param features Optional finite one-hot numeric matrix assigning genes to
 #'   nonempty annotation strata. It must have explicit, unique, nonempty,
 #'   non-missing gene row names identical to `input_data` in the same order and
@@ -21,9 +23,13 @@
 #'   not supplied.
 #' @param grid_size Number of numerical-integration points per component.
 #' @param mutvar_est Compute mutational variance and annotation summaries.
+#'   This requires `case_rate`; expected-count-only inputs must set this to
+#'   `FALSE`.
 #' @param max_iter,max_iter_boot,tol Controls retained for the optional legacy
 #'   optimizer.
-#' @param prevalence Population prevalence on the 0--1 scale.
+#' @param prevalence Population prevalence on the 0--1 scale. Required when
+#'   component endpoints are generated, mutational variance is requested, or
+#'   effective penetrance is requested; otherwise it may be `NULL`.
 #' @param bootstrap Run a gene-level nonparametric bootstrap.
 #' @param bootstrap_samples Optional matrix of user-supplied bootstrap row
 #'   indices.
@@ -41,9 +47,11 @@
 #'
 #' @return An object of class `BurdenMLEDN_fit`. Important fields include
 #'   `delta`, `component_endpoints`, `ll`, `mutvar_output`, `penetrance`,
-#'   `bootstrap_output`, and `optimizer_elapsed`. Stratum-indexed weights,
-#'   mutational-variance summaries, and confidence intervals retain the
-#'   feature-column names.
+#'   `bootstrap_output`, `input_summary`, and `optimizer_elapsed`.
+#'   `input_summary$sample_size` is `NA` when `N` was not supplied, and
+#'   `input_summary$case_rate_available` reports whether mutation-rate-dependent
+#'   estimands are supported. Stratum-indexed weights, mutational-variance
+#'   summaries, and confidence intervals retain the feature-column names.
 #' @export
 #'
 #' @examples
@@ -81,16 +89,29 @@ BurdenMLE_DN <- function(input_data,
 
   optimizer <- match.arg(optimizer)
 
-  if (is.null(prevalence) || length(prevalence) != 1L ||
-      !is.finite(prevalence) || prevalence <= 0 || prevalence >= 1) {
-    stop("prevalence must be one finite number strictly between 0 and 1.")
+  genetic_data = process_data_trio(input_data)
+  if (mutvar_est) {
+    require_case_rate_for_mutvar(genetic_data)
+  }
+
+  prevalence_required <- is.null(component_endpoints) || mutvar_est ||
+    estimate_effective_penetrance
+  if (prevalence_required || !is.null(prevalence)) {
+    if (is.null(prevalence) || length(prevalence) != 1L ||
+        !is.numeric(prevalence) || !is.finite(prevalence) ||
+        prevalence <= 0 || prevalence >= 1) {
+      stop(
+        "prevalence must be one finite number strictly between 0 and 1 when ",
+        "component endpoints are generated, mutational variance is requested, ",
+        "or effective penetrance is requested."
+      )
+    }
   }
   if (length(grid_size) != 1L || grid_size < 1 ||
       grid_size != as.integer(grid_size)) {
     stop("grid_size must be one positive integer.")
   }
 
-  genetic_data = process_data_trio(input_data)
   features = validate_features_trio(genetic_data, features)
 
   component_endpoints = choose_component_endpoints_trio(component_endpoints,
@@ -348,7 +369,12 @@ BurdenMLE_DN <- function(input_data,
   model$input_summary <- list(
     genes = nrow(genetic_data),
     observed_variants = sum(genetic_data$case_count),
-    sample_size = unique(genetic_data$N)
+    sample_size = if ("N" %in% names(genetic_data)) {
+      unique(genetic_data$N)
+    } else {
+      NA_real_
+    },
+    case_rate_available = "case_rate" %in% names(genetic_data)
   )
   class(model) <- c("BurdenMLEDN_fit", "list")
   model

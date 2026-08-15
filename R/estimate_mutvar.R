@@ -1,9 +1,21 @@
 # Mutational-variance estimation for de novo burden models.
 
+require_case_rate_for_mutvar <- function(genetic_data) {
+  if (!"case_rate" %in% names(genetic_data)) {
+    stop(
+      "Mutational variance requires case_rate. For expected-count-only fitting, ",
+      "set mutvar_est = FALSE. If N is known, derive case_rate = ",
+      "expected_count / (2 * N) before fitting and rerun under your responsibility."
+    )
+  }
+  invisible(TRUE)
+}
+
 estimate_mutvar_trio <- function(model,
                                  genetic_data,
                                  prevalence,
                                  gamma_scaling_factor = 1) {
+  require_case_rate_for_mutvar(genetic_data)
   annotation_mutvar <- vapply(seq_len(ncol(model$features)), function(index) {
     mixing_weights <- model$delta[index, ]
     mixing_weights[mixing_weights < 0] <- 0

@@ -4,31 +4,13 @@ process_data_trio <- function(input_data, features = NULL) {
   if (!is.data.frame(input_data)) {
     stop("input_data must be a data frame with one row per gene.")
   }
-  required <- c("case_count", "case_rate", "N")
-  missing_columns <- setdiff(required, names(input_data))
-  if (length(missing_columns)) {
-    stop(
-      "input_data is missing required column(s): ",
-      paste(missing_columns, collapse = ", ")
-    )
+  if (!"case_count" %in% names(input_data)) {
+    stop("input_data is missing required column: case_count.")
   }
   if (nrow(input_data) < 2L) {
     stop("input_data must contain at least two genes.")
   }
-  if (anyNA(input_data[, required, drop = FALSE]) ||
-      any(!is.finite(as.matrix(input_data[, required, drop = FALSE])))) {
-    stop("Required input columns must contain finite, non-missing values.")
-  }
-  if (any(input_data$case_count < 0) ||
-      any(abs(input_data$case_count - round(input_data$case_count)) > 1e-8)) {
-    stop("case_count must contain nonnegative integer counts.")
-  }
-  if (any(input_data$case_rate < 0)) {
-    stop("case_rate must contain nonnegative per-haploid mutation rates.")
-  }
-  if (length(unique(input_data$N)) != 1L || any(input_data$N <= 0)) {
-    stop("N must be one positive sample size repeated for every gene.")
-  }
+
   gene_ids <- rownames(input_data)
   automatic_row_names <- .row_names_info(input_data, type = 1L) < 0L
   if (automatic_row_names || is.null(gene_ids) || anyNA(gene_ids) ||
@@ -37,7 +19,70 @@ process_data_trio <- function(input_data, features = NULL) {
       "input_data must have explicit, unique, nonempty, non-missing gene row names."
     )
   }
-  input_data$expected_count <- 2 * input_data$N * input_data$case_rate
+
+  if (!is.numeric(input_data$case_count) || !is.null(dim(input_data$case_count)) ||
+      anyNA(input_data$case_count) ||
+      any(!is.finite(input_data$case_count)) ||
+      any(input_data$case_count < 0) ||
+      any(abs(input_data$case_count - round(input_data$case_count)) > 1e-8)) {
+    stop("case_count must contain finite, non-missing, nonnegative integer counts.")
+  }
+
+  has_expected_count <- "expected_count" %in% names(input_data)
+  has_case_rate <- "case_rate" %in% names(input_data)
+  has_sample_size <- "N" %in% names(input_data)
+  if (!has_expected_count && !(has_case_rate && has_sample_size)) {
+    stop(
+      "input_data must supply either (case_count, expected_count) or ",
+      "(case_count, case_rate, N)."
+    )
+  }
+
+  if (has_expected_count &&
+      (!is.numeric(input_data$expected_count) ||
+       !is.null(dim(input_data$expected_count)) ||
+       anyNA(input_data$expected_count) ||
+       any(!is.finite(input_data$expected_count)) ||
+       any(input_data$expected_count < 0))) {
+    stop("expected_count must contain finite, non-missing, nonnegative values.")
+  }
+  if (has_case_rate &&
+      (!is.numeric(input_data$case_rate) || !is.null(dim(input_data$case_rate)) ||
+       anyNA(input_data$case_rate) ||
+       any(!is.finite(input_data$case_rate)) || any(input_data$case_rate < 0))) {
+    stop(
+      "case_rate must contain finite, non-missing, nonnegative per-haploid mutation rates."
+    )
+  }
+  if (has_sample_size &&
+      (!is.numeric(input_data$N) || !is.null(dim(input_data$N)) ||
+       anyNA(input_data$N) ||
+       any(!is.finite(input_data$N)) ||
+       length(unique(input_data$N)) != 1L || any(input_data$N <= 0))) {
+    stop("N must be one finite positive sample size repeated for every gene.")
+  }
+
+  if (has_case_rate && has_sample_size) {
+    derived_expected_count <- 2 * input_data$N * input_data$case_rate
+    if (any(!is.finite(derived_expected_count))) {
+      stop("2 * N * case_rate must produce finite expected counts.")
+    }
+    if (has_expected_count) {
+      consistency_tolerance <- 1e-12 + 1e-8 * pmax(
+        abs(input_data$expected_count),
+        abs(derived_expected_count)
+      )
+      if (any(abs(input_data$expected_count - derived_expected_count) >
+              consistency_tolerance)) {
+        stop(
+          "Supplied expected_count values are inconsistent with ",
+          "2 * N * case_rate."
+        )
+      }
+    } else {
+      input_data$expected_count <- derived_expected_count
+    }
+  }
 
   input_data
 }

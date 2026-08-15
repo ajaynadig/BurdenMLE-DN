@@ -2,17 +2,40 @@
 
 ## Input table
 
-`BurdenMLE_DN()` accepts a data frame with at least two genes, explicit,
-unique, nonempty, non-missing gene row names, and three required columns:
+`BurdenMLE_DN()` accepts a data frame with at least two genes and explicit,
+unique, nonempty, non-missing gene row names. `case_count` is always required.
+The likelihood exposure can be supplied through either of two schemas:
+
+1. `case_count`, `case_rate`, and `N`; or
+2. `case_count` and an exact `expected_count`.
 
 | Field | Meaning |
 |---|---|
 | `case_count` | Nonnegative integer number of observed de novo variants |
-| `case_rate` | Per-haploid gene-level mutation rate for the analyzed class |
-| `N` | Number of affected offspring; repeat the same value for every gene |
+| `expected_count` | Optional exact expected count under no association |
+| `case_rate` | Optional per-haploid gene-level mutation rate for the analyzed class |
+| `N` | Optional number of affected offspring; when supplied, repeat the same value for every gene |
 
-The expected count under no association is computed as
-`2 * N * case_rate`. Rows with missing or non-finite values are rejected.
+When expected counts are absent, they are computed as `2 * N * case_rate`.
+Supplied expected counts take precedence and are retained exactly. If all three
+exposure columns are present, supplied expected counts must agree with
+`2 * N * case_rate` within an absolute tolerance of `1e-12` plus a relative
+tolerance of `1e-8`. Rows with missing, non-finite, or negative exposure values
+are rejected.
+
+Expected-count-only inputs support fitting, null simulation, posterior
+summaries, and effective penetrance. Mutational variance requires `case_rate`;
+set `mutvar_est = FALSE` when it is unavailable. If `N` is known, callers may
+derive `case_rate = expected_count / (2 * N)` and rerun under their own
+responsibility; the package does not infer mutation rates or sample sizes.
+`input_summary$sample_size` is `NA` when `N` is absent, and
+`input_summary$case_rate_available` states whether mutation-rate-dependent
+estimands are supported.
+
+`prevalence` is required when the package generates component endpoints or
+when mutational variance or effective penetrance is requested. It may be
+omitted when explicit endpoints are supplied and both prevalence-dependent
+estimands are disabled, as in mutation-rate calibration fits.
 
 For stratified models, `features` must be a finite one-hot numeric matrix with
 one row per gene. Its unique, nonempty, non-missing row names must be identical
@@ -26,7 +49,7 @@ must contain a gene. The same contract applies to MixSQP and EM. Omitting
 
 | Argument | Purpose | Default |
 |---|---|---|
-| `prevalence` | Population prevalence used for effect grid and derived estimates | required |
+| `prevalence` | Population prevalence used for generated effect grids and prevalence-dependent estimates | conditionally required |
 | `no_cpts` | Number of mixture components | 10 |
 | `component_endpoints` | Optional finite, unique, strictly increasing upper endpoints on the log-rate-ratio scale; takes precedence over `no_cpts` | prevalence-dependent grid |
 | `grid_size` | Integration points per uniform component | 10 |
