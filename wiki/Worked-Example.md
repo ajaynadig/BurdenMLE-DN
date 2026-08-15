@@ -27,6 +27,9 @@ fit$mutvar_output$total_mutvar
 fit$mutvar_output$mutvar_CI
 fit$penetrance
 mixture_weights(fit)
+
+sampler <- posterior_gene_sampler(fit, dat)
+log_rate_ratios <- posterior_gene_samples(sampler, num_samples = 3)
 ```
 
 Twenty bootstrap replicates keep the example short; use at least the
@@ -34,6 +37,12 @@ manuscript-specified count for substantive inference. The bootstrap resamples
 genes and refits the mixture in each replicate. Set `bootstrap_seed` to replay
 generated samples, or supply a character `bootstrap_samples` matrix containing
 gene row names when several related fits must use exactly the same draws.
+
+The prepared posterior sampler is intended for repeated simulations such as
+gene-discovery forecasts. It retains the fitted component probabilities, then
+conditions each continuous within-component draw on that gene's observed and
+expected counts. Its result is always a named gene-by-sample matrix. Set the
+ordinary R seed before sampling when draws must be reproducible.
 
 For a real analysis, the bundled count-free reference provides the baseline
 LOEUF annotations and mutation rates:

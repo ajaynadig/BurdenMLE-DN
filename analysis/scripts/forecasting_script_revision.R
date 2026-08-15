@@ -70,27 +70,9 @@ cohort_scaling <- setNames(vapply(cohort_names, function(cohort) {
   )$MLE
 }, numeric(1)), cohort_names)
 
-# Cache posterior component probabilities. This removes repeated matrix
-# multiplication while preserving the exact posterior-sampling distribution.
-posterior_sampler <- function(model) {
-  posterior <- (model$features %*% model$delta) * model$conditional_likelihood
-  posterior <- posterior / rowSums(posterior)
-  list(
-    cumulative = t(apply(posterior, 1, cumsum)),
-    endpoints = model$component_endpoints
-  )
-}
-
-sample_log_rr <- function(sampler) {
-  u <- runif(nrow(sampler$cumulative))
-  component <- rowSums(sampler$cumulative < u) + 1L
-  endpoint <- sampler$endpoints[component]
-  runif(length(endpoint), pmin(0, endpoint), pmax(0, endpoint))
-}
-
 forecast_once <- function(old_data, sampler, n_new, gamma_scaling_factor,
                           thresholds = c(0, 2, 5, 10, 20)) {
-  log_rr <- sample_log_rr(sampler)
+  log_rr <- posterior_gene_samples(sampler, num_samples = 1L)[, 1L]
   new_counts <- rpois(
     nrow(old_data),
     2 * n_new * exp(log_rr * gamma_scaling_factor) * old_data$case_rate
@@ -112,20 +94,28 @@ forecast_once <- function(old_data, sampler, n_new, gamma_scaling_factor,
   )
 }
 
+overall_sampler <- posterior_gene_sampler(overall_model, overall_data)
+ddid_sampler <- posterior_gene_sampler(
+  get_model("Combined DDID PTV"), get_data("Combined DDID PTV")
+)
+non_ddid_sampler <- posterior_gene_sampler(
+  get_model("Combined Non-DDID PTV"), get_data("Combined Non-DDID PTV")
+)
+
 scenario_list <- list(
-  SPARK = list(data = overall_data, sampler = posterior_sampler(overall_model),
+  SPARK = list(data = overall_data, sampler = overall_sampler,
                scaling = cohort_scaling[["SPARK"]], group = "cohort"),
-  ASC = list(data = overall_data, sampler = posterior_sampler(overall_model),
+  ASC = list(data = overall_data, sampler = overall_sampler,
              scaling = cohort_scaling[["ASC"]], group = "cohort"),
-  GeneDx = list(data = overall_data, sampler = posterior_sampler(overall_model),
+  GeneDx = list(data = overall_data, sampler = overall_sampler,
                 scaling = cohort_scaling[["GeneDx"]], group = "cohort"),
   # Both phenotype scenarios begin with the same complete observed dataset.
   # Only the distribution generating newly added cases differs.
   DDID = list(data = overall_data,
-              sampler = posterior_sampler(get_model("Combined DDID PTV")),
+              sampler = ddid_sampler,
               scaling = 1, group = "ddid"),
   `Non-DDID` = list(data = overall_data,
-                    sampler = posterior_sampler(get_model("Combined Non-DDID PTV")),
+                    sampler = non_ddid_sampler,
                     scaling = 1, group = "ddid")
 )
 
