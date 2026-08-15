@@ -32,12 +32,18 @@
 #'   component endpoints are generated, mutational variance is requested, or
 #'   effective penetrance is requested; otherwise it may be `NULL`.
 #' @param bootstrap Run a gene-level nonparametric bootstrap.
-#' @param bootstrap_samples Optional matrix of user-supplied bootstrap row
-#'   indices.
+#' @param bootstrap_samples Optional character matrix of sampled gene IDs, with
+#'   one input-gene draw per row and one replicate per column. Repeated IDs are
+#'   allowed. Numeric row positions are not accepted.
 #' @param n_boot Number of bootstrap replicates.
+#' @param bootstrap_seed Positive integer seed for generated bootstrap samples.
+#'   The caller's RNG state is restored. Ignored when `bootstrap_samples` is
+#'   supplied.
 #' @param null_sim Run optional parametric null simulations. These are not
 #'   needed for estimation or bootstrap confidence intervals.
 #' @param n_null Number of null simulations.
+#' @param null_seed Positive integer seed for null simulations. The caller's
+#'   RNG state is restored.
 #' @param return_likelihood Store the maximized log likelihood.
 #' @param estimate_posteriors Compute gene-level posterior summaries.
 #' @param estimate_effective_penetrance Compute effective penetrance.
@@ -47,8 +53,10 @@
 #'   the requested component grid.
 #'
 #' @return An object of class `BurdenMLEDN_fit`. Important fields include
-#'   `delta`, `component_endpoints`, `ll`, `mutvar_output`, `penetrance`,
-#'   `bootstrap_output`, `input_summary`, and `optimizer_elapsed`.
+#'   `delta`, `component_endpoints`, `ll`, `fit_status`,
+#'   `uncertainty_reliable`, `mutvar_output`, `penetrance`,
+#'   `bootstrap_output`, `null_output`, `input_summary`, and
+#'   `optimizer_elapsed`.
 #'   `input_summary$sample_size` is `NA` when `N` was not supplied, and
 #'   `input_summary$case_rate_available` reports whether mutation-rate-dependent
 #'   estimands are supported. Stratum-indexed weights, mutational-variance
@@ -80,8 +88,10 @@ BurdenMLE_DN <- function(input_data,
                           bootstrap = TRUE,
                           bootstrap_samples = NULL,
                           n_boot = 100,
+                          bootstrap_seed = 1L,
                           null_sim = FALSE,
                           n_null = 100,
+                          null_seed = 1L,
                           return_likelihood = TRUE,
                           estimate_posteriors = TRUE,
                           estimate_effective_penetrance = TRUE,
@@ -89,6 +99,18 @@ BurdenMLE_DN <- function(input_data,
                           mixsqp_control = list()) {
 
   optimizer <- match.arg(optimizer)
+
+  if (bootstrap || null_sim) {
+    had_rng_state <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+    if (had_rng_state) caller_rng_state <- get(".Random.seed", envir = .GlobalEnv)
+    on.exit({
+      if (had_rng_state) {
+        assign(".Random.seed", caller_rng_state, envir = .GlobalEnv)
+      } else if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+        rm(".Random.seed", envir = .GlobalEnv)
+      }
+    }, add = TRUE)
+  }
 
   genetic_data = process_data_trio(input_data)
   if (mutvar_est) {
@@ -114,6 +136,22 @@ BurdenMLE_DN <- function(input_data,
   }
 
   features = validate_features_trio(genetic_data, features)
+
+  bootstrap_contract <- NULL
+  if (bootstrap) {
+    bootstrap_contract <- prepare_bootstrap_samples(
+      rownames(genetic_data), n_boot, bootstrap_samples, bootstrap_seed
+    )
+    n_boot <- length(bootstrap_contract$replicate_ids)
+  }
+  null_contract <- NULL
+  if (null_sim) {
+    n_null <- validate_positive_integer(n_null, "n_null")
+    null_seeds <- resampling_seeds(null_seed, n_null, "null_seed", "null_")
+    null_contract <- list(
+      replicate_ids = names(null_seeds), seeds = null_seeds
+    )
+  }
 
   component_endpoints = choose_component_endpoints_trio(component_endpoints,
                                                         no_cpts,
@@ -144,20 +182,39 @@ BurdenMLE_DN <- function(input_data,
   )
 
   # Bootstrap the selected optimizer.
+  uncertainty_checks <- logical(0)
   if (bootstrap) {
     bootstrap_start <- proc.time()[["elapsed"]]
     if (optimizer == "EM") {
-      model$bootstrap_output = bootstrap_EM(model,
-                                            n_boot,
-                                            max_iter_boot,
-                                            bootstrap_samples,
-                                            tol = tol)
+      bootstrap_fit_status <- bootstrap_EM(
+        model,
+        bootstrap_contract$indices,
+        bootstrap_contract$replicate_ids,
+        max_iter_boot,
+        tol = tol
+      )
     } else {
-      model$bootstrap_output = bootstrap_MixSQP(model,
-                                                n_boot,
-                                                bootstrap_samples,
-                                                control = mixsqp_control)
+      bootstrap_fit_status <- bootstrap_MixSQP(
+        model,
+        bootstrap_contract$indices,
+        bootstrap_contract$replicate_ids,
+        control = mixsqp_control
+      )
     }
+    bootstrap_reliable <- assess_uncertainty_fits(
+      bootstrap_fit_status, "Bootstrap"
+    )
+    model$bootstrap_output <- list(
+      bootstrap_delta = lapply(bootstrap_fit_status, `[[`, "weights"),
+      bootstrap_samples = bootstrap_contract$samples,
+      bootstrap_indices = bootstrap_contract$indices,
+      fit_status = bootstrap_fit_status,
+      replicate_ids = bootstrap_contract$replicate_ids,
+      replicate_seeds = bootstrap_contract$seeds,
+      sample_source = bootstrap_contract$source,
+      reliable = bootstrap_reliable
+    )
+    uncertainty_checks <- c(uncertainty_checks, bootstrap_reliable)
     model$optimizer_elapsed["bootstrap"] <-
       proc.time()[["elapsed"]] - bootstrap_start
 
@@ -165,19 +222,40 @@ BurdenMLE_DN <- function(input_data,
 
   if (null_sim) {
     if (optimizer == "EM") {
-      model$null_delta = null_EM_trio(genetic_data,
-                                      model,
-                                      max_iter,
-                                      n_null,
-                                      grid_size,
-                                      tol)
+      null_fit_status <- null_EM_trio(
+        genetic_data,
+        model,
+        max_iter,
+        null_contract$seeds,
+        null_contract$replicate_ids,
+        grid_size,
+        tol
+      )
     } else {
-      model$null_delta = null_MixSQP_trio(genetic_data,
-                                          model,
-                                          n_null,
-                                          grid_size,
-                                          control = mixsqp_control)
+      null_fit_status <- null_MixSQP_trio(
+        genetic_data,
+        model,
+        null_contract$seeds,
+        null_contract$replicate_ids,
+        grid_size,
+        control = mixsqp_control
+      )
     }
+    null_reliable <- assess_uncertainty_fits(null_fit_status, "Null simulation")
+    model$null_delta <- lapply(null_fit_status, `[[`, "weights")
+    model$null_output <- list(
+      null_delta = model$null_delta,
+      fit_status = null_fit_status,
+      replicate_ids = null_contract$replicate_ids,
+      replicate_seeds = null_contract$seeds,
+      reliable = null_reliable
+    )
+    uncertainty_checks <- c(uncertainty_checks, null_reliable)
+  }
+  model$uncertainty_reliable <- if (length(uncertainty_checks) == 0L) {
+    NA
+  } else {
+    all(uncertainty_checks)
   }
 
   if (mutvar_est) {
@@ -189,51 +267,54 @@ BurdenMLE_DN <- function(input_data,
 
     #bootstrap mutvar estimation
     if (bootstrap) {
-      bootstrap_mutvar_output <- lapply(1:n_boot,
-                                              function(iter) {
+      bootstrap_mutvar_output <- lapply(seq_len(n_boot), function(iter) {
+        replicate <- reconstruct_bootstrap_replicate(model, genetic_data, iter)
+        estimate_mutvar_trio(
+          model = replicate$model,
+          genetic_data = replicate$genetic_data,
+          prevalence = prevalence
+        )
+      })
+      names(bootstrap_mutvar_output) <- model$bootstrap_output$replicate_ids
+      bootstrap_matrix <- function(field) {
+        output <- matrix(
+          vapply(
+            bootstrap_mutvar_output,
+            function(value) unname(value[[field]]),
+            numeric(length(stratum_names))
+          ),
+          nrow = length(stratum_names),
+          ncol = length(bootstrap_mutvar_output)
+        )
+        dimnames(output) <- list(
+          stratum_names, model$bootstrap_output$replicate_ids
+        )
+        output
+      }
+      bootstrap_CI <- function(values) {
+        output <- matrix(
+          apply(values, 1L, quantile, probs = c(0.025, 0.975)),
+          nrow = 2L
+        )
+        dimnames(output) <- list(c("2.5%", "97.5%"), stratum_names)
+        output
+      }
 
-
-
-                                                sample_indices = model$bootstrap_output$bootstrap_samples[,iter]
-                                                model_boot = subset_model_likelihood_rows(
-                                                  model,
-                                                  sample_indices
-                                                )
-                                                model_boot$features = model_boot$features[model$bootstrap_output$bootstrap_samples[,iter],]
-                                                model_boot$delta = model$bootstrap_output$bootstrap_delta[[iter]]
-
-                                                boot_mutvar = estimate_mutvar_trio(model = model_boot,
-                                                                                               genetic_data = genetic_data[model$bootstrap_output$bootstrap_samples[,iter],],
-                                                                                               prevalence = prevalence)
-
-                                              })
-
-      bootstrap_mutvar_ests = sapply(1:length(bootstrap_mutvar_output), function(x) bootstrap_mutvar_output[[x]]$total_mutvar)
+      bootstrap_mutvar_ests <- vapply(
+        bootstrap_mutvar_output, `[[`, numeric(1), "total_mutvar"
+      )
       mutvar_CI = quantile(bootstrap_mutvar_ests,c(0.025,0.975))
 
-      bootstrap_annotmutvar_ests = sapply(1:length(bootstrap_mutvar_output), function(x) bootstrap_mutvar_output[[x]]$annot_mutvar)
-      annot_mutvar_CI = sapply(1:nrow(bootstrap_annotmutvar_ests),
-                           function(i) {
-                             quantile(bootstrap_annotmutvar_ests[i,],c(0.025,0.975))
-                           })
-      colnames(annot_mutvar_CI) <- stratum_names
+      bootstrap_annotmutvar_ests <- bootstrap_matrix("annot_mutvar")
+      annot_mutvar_CI <- bootstrap_CI(bootstrap_annotmutvar_ests)
 
-
-      bootstrap_fracmutvar_ests = sapply(1:length(bootstrap_mutvar_output), function(x) bootstrap_mutvar_output[[x]]$frac_mutvar)
-      bootstrap_enrich_ests = sapply(1:length(bootstrap_mutvar_output), function(x) bootstrap_mutvar_output[[x]]$enrichment)
+      bootstrap_fracmutvar_ests <- bootstrap_matrix("frac_mutvar")
+      bootstrap_enrich_ests <- bootstrap_matrix("enrichment")
       normalized_bootstrap_defined <- all(is.finite(bootstrap_fracmutvar_ests)) &&
         all(is.finite(bootstrap_enrich_ests))
       if (normalized_bootstrap_defined) {
-        fracmutvar_CI = sapply(1:nrow(bootstrap_fracmutvar_ests),
-                              function(i) {
-                                quantile(bootstrap_fracmutvar_ests[i,],c(0.025,0.975))
-                              })
-        colnames(fracmutvar_CI) <- stratum_names
-        enrich_CI = sapply(1:nrow(bootstrap_enrich_ests),
-                           function(i) {
-                             quantile(bootstrap_enrich_ests[i,],c(0.025,0.975))
-                           })
-        colnames(enrich_CI) <- stratum_names
+        fracmutvar_CI <- bootstrap_CI(bootstrap_fracmutvar_ests)
+        enrich_CI <- bootstrap_CI(bootstrap_enrich_ests)
       } else {
         warning(
           "At least one bootstrap replicate has zero total mutational variance; ",
@@ -329,26 +410,27 @@ BurdenMLE_DN <- function(input_data,
     peneff_CI = NA
     if (bootstrap) {
       cat("...bootstrap effective penetrance")
-      bootstrap_peneff_ests = pbsapply(1:length(model$bootstrap_output$bootstrap_delta),
-                                     function(iter) {
-                                       sample_indices = model$bootstrap_output$bootstrap_samples[,iter]
-                                       model_boot = subset_model_likelihood_rows(
-                                         model,
-                                         sample_indices
-                                       )
-                                       model_boot$features = model_boot$features[model$bootstrap_output$bootstrap_samples[,iter],]
-                                       model_boot$delta = model$bootstrap_output$bootstrap_delta[[iter]]
-
-                                       moments_boot = list(
-                                         numerator = penetrance_moments$numerator[sample_indices, , drop = FALSE],
-                                         denominator = penetrance_moments$denominator[sample_indices, , drop = FALSE]
-                                       )
-
-                                       effective_penetrance_func(model_boot,
-                                                                 genetic_data[sample_indices,],
-                                                                 prevalence,
-                                                                 moments = moments_boot)
-                                     })
+      bootstrap_peneff_ests <- pbsapply(
+        seq_along(model$bootstrap_output$bootstrap_delta),
+        function(iter) {
+          replicate <- reconstruct_bootstrap_replicate(model, genetic_data, iter)
+          moments_boot <- list(
+            numerator = penetrance_moments$numerator[
+              replicate$indices, , drop = FALSE
+            ],
+            denominator = penetrance_moments$denominator[
+              replicate$indices, , drop = FALSE
+            ]
+          )
+          effective_penetrance_func(
+            replicate$model,
+            replicate$genetic_data,
+            prevalence,
+            moments = moments_boot
+          )
+        }
+      )
+      names(bootstrap_peneff_ests) <- model$bootstrap_output$replicate_ids
 
       if (all(is.finite(bootstrap_peneff_ests))) {
         peneff_CI = quantile(bootstrap_peneff_ests,c(0.025,0.975))

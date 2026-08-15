@@ -106,17 +106,17 @@ bootstrap_function <- function(model, function_to_bootstrap, ...) {
     iter_args <- args
     model_boot <- model
     model_boot$conditional_likelihood <- model_boot$conditional_likelihood[
-      model$bootstrap_output$bootstrap_samples[, iter], , drop = FALSE
+      model$bootstrap_output$bootstrap_indices[, iter], , drop = FALSE
     ]
     model_boot$features <- model_boot$features[
-      model$bootstrap_output$bootstrap_samples[, iter], , drop = FALSE
+      model$bootstrap_output$bootstrap_indices[, iter], , drop = FALSE
     ]
     model_boot$delta <- model$bootstrap_output$bootstrap_delta[[iter]]
 
     # If genetic_data is provided in ..., subset it
     if ("genetic_data" %in% names(iter_args)) {
       genetic_data_boot <- iter_args$genetic_data[
-        model$bootstrap_output$bootstrap_samples[, iter], , drop = FALSE
+        model$bootstrap_output$bootstrap_indices[, iter], , drop = FALSE
       ]
       iter_args$genetic_data <- genetic_data_boot
     }
@@ -670,12 +670,12 @@ get_scaled_mutvar <- function(model,
 
 
                                                 model_boot = model
-                                                model_boot$conditional_likelihood = model_boot$conditional_likelihood[model$bootstrap_output$bootstrap_samples[,iter],]
-                                                model_boot$features = model_boot$features[model$bootstrap_output$bootstrap_samples[,iter],]
+                                                model_boot$conditional_likelihood = model_boot$conditional_likelihood[model$bootstrap_output$bootstrap_indices[,iter], , drop = FALSE]
+                                                model_boot$features = model_boot$features[model$bootstrap_output$bootstrap_indices[,iter], , drop = FALSE]
                                                 model_boot$delta = model$bootstrap_output$bootstrap_delta[[iter]]
 
                                                 boot_mutvar = estimate_mutvar_trio(model = model_boot,
-                                                                                               genetic_data = genetic_data[model$bootstrap_output$bootstrap_samples[,iter],],
+                                                                                               genetic_data = genetic_data[model$bootstrap_output$bootstrap_indices[,iter], , drop = FALSE],
                                                                                                prevalence = prevalence,
                                                                                                gamma_scaling_factor = gamma_scaling_factor)
 
@@ -705,11 +705,11 @@ scaled_peneff <- function(model, genetic_data, prevalence, gamma_scaling_factor 
   bootstrap_peneff_ests = pbsapply(1:length(model$bootstrap_output$bootstrap_delta),
                                    function(iter) {
                                      model_boot = model
-                                     model_boot$conditional_likelihood = model_boot$conditional_likelihood[model$bootstrap_output$bootstrap_samples[,iter],]
-                                     model_boot$features = model_boot$features[model$bootstrap_output$bootstrap_samples[,iter],]
+                                     model_boot$conditional_likelihood = model_boot$conditional_likelihood[model$bootstrap_output$bootstrap_indices[,iter], , drop = FALSE]
+                                     model_boot$features = model_boot$features[model$bootstrap_output$bootstrap_indices[,iter], , drop = FALSE]
                                      model_boot$delta = model$bootstrap_output$bootstrap_delta[[iter]]
 
-                                     genetic_data_boot = genetic_data[model$bootstrap_output$bootstrap_samples[,iter],]
+                                     genetic_data_boot = genetic_data[model$bootstrap_output$bootstrap_indices[,iter], , drop = FALSE]
 
                                      effective_penetrance_func(model_boot,
                                                                genetic_data_boot,
@@ -736,12 +736,12 @@ bootstrap_mutvar <- function(model,genetic_data,prevalence, n_boot = 100) {
 
 
                                       model_boot = model
-                                      model_boot$conditional_likelihood = model_boot$conditional_likelihood[model$bootstrap_output$bootstrap_samples[,iter],]
-                                      model_boot$features = model_boot$features[model$bootstrap_output$bootstrap_samples[,iter],]
+                                      model_boot$conditional_likelihood = model_boot$conditional_likelihood[model$bootstrap_output$bootstrap_indices[,iter], , drop = FALSE]
+                                      model_boot$features = model_boot$features[model$bootstrap_output$bootstrap_indices[,iter], , drop = FALSE]
                                       model_boot$delta = model$bootstrap_output$bootstrap_delta[[iter]]
 
                                       boot_mutvar = estimate_mutvar_trio(model = model_boot,
-                                                                         genetic_data = genetic_data[model$bootstrap_output$bootstrap_samples[,iter],],
+                                                                         genetic_data = genetic_data[model$bootstrap_output$bootstrap_indices[,iter], , drop = FALSE],
                                                                          prevalence = prevalence)
 
                                     })
@@ -806,4 +806,3 @@ get_summarytable <- function(stratum_list,model_list,data,prev_factor) {
   }
   return(summarytable)
 }
-

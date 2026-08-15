@@ -5,7 +5,8 @@
 
 MixSQP_fit <- function(model,
                        control = list(),
-                       return_likelihood = TRUE) {
+                       return_likelihood = TRUE,
+                       allow_status_return = FALSE) {
   if (!requireNamespace("mixsqp", quietly = TRUE)) {
     stop(
       "optimizer = \"mixsqp\" requires the mixsqp package. Install it with ",
@@ -55,50 +56,63 @@ MixSQP_fit <- function(model,
     }
 
     x0 <- model$delta[stratum, ]
-    fits[[stratum]] <- mixsqp::mixsqp(
-      likelihood,
-      x0 = x0,
-      control = control
+    run_mixsqp <- function() mixsqp::mixsqp(
+      likelihood, x0 = x0, control = control
     )
-    if (fits[[stratum]]$status != "converged to optimal solution") {
-      stop(
-        "MixSQP did not converge in feature stratum ", stratum,
-        ": ", fits[[stratum]]$status
-      )
+    fits[[stratum]] <- if (!allow_status_return) {
+      run_mixsqp()
+    } else {
+      suppressWarnings(run_mixsqp())
     }
     delta[stratum, ] <- fits[[stratum]]$x
   }
 
   dimnames(delta) <- dimnames(model$delta)
   model$delta <- delta
-  if (return_likelihood) {
-    model$ll <- absolute_mixture_log_likelihood(model)
-  }
+  final_likelihood <- tryCatch(
+    absolute_mixture_log_likelihood(model),
+    error = function(error) NA_real_
+  )
+  converged_by_stratum <- vapply(
+    fits,
+    function(fit) identical(fit$status, "converged to optimal solution"),
+    logical(1)
+  )
+  backend_status <- vapply(fits, function(fit) fit$status, character(1))
+  names(backend_status) <- rownames(model$delta)
+  iteration_count <- sum(vapply(fits, function(fit) {
+    if (is.null(fit$progress)) 0L else nrow(fit$progress)
+  }, integer(1)))
+  model$fit_status <- new_fit_status(
+    optimizer = "mixsqp",
+    weights = model$delta,
+    log_likelihood = final_likelihood,
+    converged = all(converged_by_stratum),
+    backend_message = paste(
+      paste(names(backend_status), backend_status, sep = ": "),
+      collapse = "; "
+    ),
+    iterations = iteration_count
+  )
+  if (return_likelihood) model$ll <- final_likelihood
   model$mixsqp_output <- fits
+  if (!allow_status_return && !model$fit_status$usable) {
+    stop("MixSQP returned an unusable fit (", model$fit_status$code, ").")
+  }
+  if (!allow_status_return && !model$fit_status$converged) {
+    stop("MixSQP did not converge: ", model$fit_status$backend_message, ".")
+  }
   model
 }
 
 bootstrap_MixSQP <- function(model,
-                             n_boot,
-                             bootstrap_samples = NULL,
-                             bootstrap_seeds = NULL,
+                             bootstrap_indices,
+                             replicate_ids,
                              control = list()) {
-  if (is.null(bootstrap_samples)) {
-    if (is.null(bootstrap_seeds)) {
-      bootstrap_seeds <- seq_len(n_boot)
-    }
-    bootstrap_samples <- sapply(bootstrap_seeds, function(seed) {
-      set.seed(seed)
-      sample(seq_len(nrow(model$conditional_likelihood)), replace = TRUE)
-    })
-    cat("...bootstrap MixSQP")
-  } else {
-    cat("...bootstrap MixSQP with user-specified samples")
-  }
-
-  bootstrap_delta <- pblapply(seq_len(n_boot), function(iter) {
+  cat("...bootstrap MixSQP")
+  fit_status <- pblapply(seq_along(replicate_ids), function(iter) {
     model_boot <- model
-    sample_indices <- bootstrap_samples[, iter]
+    sample_indices <- bootstrap_indices[, iter]
     model_boot <- subset_model_likelihood_rows(model_boot, sample_indices)
     model_boot$features <- model_boot$features[sample_indices, , drop = FALSE]
     # Begin every resampled fit from the same neutral, strictly positive state
@@ -107,43 +121,47 @@ bootstrap_MixSQP <- function(model,
     MixSQP_fit(
       model_boot,
       control = control,
-      return_likelihood = FALSE
-    )$delta
+      return_likelihood = FALSE,
+      allow_status_return = TRUE
+    )$fit_status
   })
-
-  list(
-    bootstrap_delta = bootstrap_delta,
-    bootstrap_samples = bootstrap_samples
-  )
+  names(fit_status) <- replicate_ids
+  fit_status
 }
 
 null_MixSQP_trio <- function(genetic_data,
                              model,
-                             n_null,
+                             null_seeds,
+                             replicate_ids,
                              grid_size,
                              control = list()) {
   cat("...null MixSQP")
 
-  pblapply(seq_len(n_null), function(iter) {
+  fit_status <- pblapply(seq_along(replicate_ids), function(iter) {
     if (iter %% 20 == 0) {
       cat(paste0("...", iter))
     }
-    genetic_data_null <- genetic_data
-    genetic_data_null$case_count <- rpois(
-      nrow(genetic_data),
-      genetic_data$expected_count
-    )
-    model_null <- initialize_model(
-      likelihood_function = poisson_uniform_likelihood,
-      genetic_data = genetic_data_null,
-      component_endpoints = model$component_endpoints,
-      features = model$features,
-      grid_size = grid_size
-    )
-    MixSQP_fit(
-      model_null,
-      control = control,
-      return_likelihood = FALSE
-    )$delta
+    with_local_seed(null_seeds[[iter]], {
+      genetic_data_null <- genetic_data
+      genetic_data_null$case_count <- rpois(
+        nrow(genetic_data),
+        genetic_data$expected_count
+      )
+      model_null <- initialize_model(
+        likelihood_function = poisson_uniform_likelihood,
+        genetic_data = genetic_data_null,
+        component_endpoints = model$component_endpoints,
+        features = model$features,
+        grid_size = grid_size
+      )
+      MixSQP_fit(
+        model_null,
+        control = control,
+        return_likelihood = FALSE,
+        allow_status_return = TRUE
+      )$fit_status
+    })
   })
+  names(fit_status) <- replicate_ids
+  fit_status
 }

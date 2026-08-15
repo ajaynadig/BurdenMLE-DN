@@ -165,7 +165,7 @@ mutvar_constant <- function(model, genetic_data) {
 }
 bootstrap_constants <- function(model, genetic_data) {
   vapply(seq_along(model$bootstrap_output$bootstrap_delta), function(iteration) {
-    indices <- model$bootstrap_output$bootstrap_samples[, iteration]
+    indices <- model$bootstrap_output$bootstrap_indices[, iteration]
     boot_model <- model
     boot_model$features <- model$features[indices, , drop = FALSE]
     boot_model$delta <- model$bootstrap_output$bootstrap_delta[[iteration]]
@@ -272,7 +272,7 @@ if (length(loeuf1_indices) != 2L) {
 loeuf1_fraction_boot <- vapply(
   seq_along(ptv_model$bootstrap_output$bootstrap_delta),
   function(iteration) {
-    indices <- ptv_model$bootstrap_output$bootstrap_samples[, iteration]
+    indices <- ptv_model$bootstrap_output$bootstrap_indices[, iteration]
     boot_model <- ptv_model
     boot_model$features <- ptv_model$features[indices, , drop = FALSE]
     boot_model$delta <- ptv_model$bootstrap_output$bootstrap_delta[[iteration]]

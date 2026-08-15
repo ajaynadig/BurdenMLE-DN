@@ -18,8 +18,10 @@ BurdenMLE_DN(
   bootstrap = TRUE,
   bootstrap_samples = NULL,
   n_boot = 100,
+  bootstrap_seed = 1L,
   null_sim = FALSE,
   n_null = 100,
+  null_seed = 1L,
   return_likelihood = TRUE,
   estimate_posteriors = TRUE,
   estimate_effective_penetrance = TRUE,
@@ -65,15 +67,23 @@ effective penetrance is requested; otherwise it may be \code{NULL}.}
 
 \item{bootstrap}{Run a gene-level nonparametric bootstrap.}
 
-\item{bootstrap_samples}{Optional matrix of user-supplied bootstrap row
-indices.}
+\item{bootstrap_samples}{Optional character matrix of sampled gene IDs, with
+one input-gene draw per row and one replicate per column. Repeated IDs are
+allowed. Numeric row positions are not accepted.}
 
 \item{n_boot}{Number of bootstrap replicates.}
+
+\item{bootstrap_seed}{Positive integer seed for generated bootstrap samples.
+The caller's RNG state is restored. Ignored when \code{bootstrap_samples} is
+supplied.}
 
 \item{null_sim}{Run optional parametric null simulations. These are not
 needed for estimation or bootstrap confidence intervals.}
 
 \item{n_null}{Number of null simulations.}
+
+\item{null_seed}{Positive integer seed for null simulations. The caller's
+RNG state is restored.}
 
 \item{return_likelihood}{Store the maximized log likelihood.}
 
@@ -89,8 +99,10 @@ the requested component grid.}
 }
 \value{
 An object of class \code{BurdenMLEDN_fit}. Important fields include
-\code{delta}, \code{component_endpoints}, \code{ll}, \code{mutvar_output}, \code{penetrance},
-\code{bootstrap_output}, \code{input_summary}, and \code{optimizer_elapsed}.
+\code{delta}, \code{component_endpoints}, \code{ll}, \code{fit_status},
+\code{uncertainty_reliable}, \code{mutvar_output}, \code{penetrance},
+\code{bootstrap_output}, \code{null_output}, \code{input_summary}, and
+\code{optimizer_elapsed}.
 \code{input_summary$sample_size} is \code{NA} when \code{N} was not supplied, and
 \code{input_summary$case_rate_available} reports whether mutation-rate-dependent
 estimands are supported. Stratum-indexed weights, mutational-variance

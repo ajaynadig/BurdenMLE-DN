@@ -222,17 +222,8 @@ run_simulation <- function(distribution, params, empirical_data, empirical_featu
     ))
     assign(".Random.seed", rng_state_after_simulation, envir = .GlobalEnv)
 
-    final_log_likelihood <- if (optimizer == "EM") {
-      tail(stats::na.omit(model$ll), 1)
-    } else {
-      model$ll
-    }
-    optimizer_status <- if (optimizer == "EM") {
-      if (sum(!is.na(model$ll)) < 10000) "tolerance reached" else "maximum iterations reached"
-    } else {
-      paste(vapply(model$mixsqp_output, function(x) x$status, character(1)),
-            collapse = "; ")
-    }
+    final_log_likelihood <- model$fit_status$log_likelihood
+    optimizer_status <- model$fit_status$backend_message
 
     #get the estimated fraction of cases with large effect mutations, using the same threshold
     est_fraccases <- get_fraccase(model, sim_data, iter_params$RR_threshold)
@@ -253,15 +244,9 @@ run_simulation <- function(distribution, params, empirical_data, empirical_featu
       log_likelihood_per_gene = unname(final_log_likelihood) / n_genes,
       total_fit_seconds = unname(fit_timing[["elapsed"]]),
       optimizer_full_fit_seconds = unname(model$optimizer_elapsed[["full_fit"]]),
-      optimizer_iterations = if (optimizer == "EM") sum(!is.na(model$ll)) else NA_integer_,
+      optimizer_iterations = model$fit_status$iterations,
       optimizer_status = optimizer_status,
-      optimizer_converged = if (optimizer == "EM") {
-        sum(!is.na(model$ll)) < 10000
-      } else {
-        all(vapply(model$mixsqp_output,
-                   function(x) x$status == "converged to optimal solution",
-                   logical(1)))
-      },
+      optimizer_converged = model$fit_status$converged,
       active_components_by_stratum = rowSums(model$delta > 1e-8),
       params = iter_params,  # Store all parameters used in this simulation
       N = N,

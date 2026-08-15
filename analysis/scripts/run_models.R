@@ -126,10 +126,18 @@ fit_BurdenMLE_DN_models <- function(data,
   }
 
   model_indices <- match(model_names, data$loop_vars$names)
-  bootstrap_gene_count <- sum(rownames(data$counts) %in% genes_to_keep)
-  bootstrap_samples <- sapply(seq_len(bootstrap_count), function(dummy) {
-    sample(seq_len(bootstrap_gene_count), replace = TRUE)
-  })
+  bootstrap_gene_ids <- rownames(data$counts)[
+    rownames(data$counts) %in% genes_to_keep
+  ]
+  bootstrap_samples <- matrix(
+    vapply(seq_len(bootstrap_count), function(dummy) {
+      bootstrap_gene_ids[
+        sample(seq_along(bootstrap_gene_ids), replace = TRUE)
+      ]
+    }, character(length(bootstrap_gene_ids))),
+    nrow = length(bootstrap_gene_ids),
+    ncol = bootstrap_count
+  )
 
   fit_model_flags <- if (is.null(data$loop_vars$fit_model)) {
     rep(TRUE, length(data$loop_vars$names))

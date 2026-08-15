@@ -224,8 +224,12 @@ assert_equal(
 
 # A negative tolerance forces the historical EM loop to its fixed iteration
 # limit, separating numerical invariance from convergence-policy work.
-em_fit <- EM_fit(model, max_iter = 20, tol = -1)
-legacy_em_fit <- EM_fit(legacy_model, max_iter = 20, tol = -1)
+em_fit <- EM_fit(
+  model, max_iter = 20, tol = -1, allow_status_return = TRUE
+)
+legacy_em_fit <- EM_fit(
+  legacy_model, max_iter = 20, tol = -1, allow_status_return = TRUE
+)
 assert_equal(em_fit$delta, legacy_em_fit$delta, 1e-12)
 assert_equal(
   component_posteriors(em_fit),
@@ -300,7 +304,10 @@ direct_extreme_ll <- sum(test_log_sum_exp(
 ))
 assert_equal(absolute_ll(extreme_model), direct_extreme_ll, 1e-12)
 stopifnot(is.finite(MixSQP_fit(extreme_model)$ll))
-extreme_em <- EM_fit(extreme_model, max_iter = 10, tol = -1)
+extreme_em <- EM_fit(
+  extreme_model, max_iter = 10, tol = -1,
+  allow_status_return = TRUE
+)
 stopifnot(all(is.finite(extreme_em$ll)))
 
 # A component-invariant row log shift leaves fitted weights and posteriors
@@ -325,7 +332,10 @@ assert_equal(
 )
 assert_equal(shifted_mixsqp$ll, mixsqp_fit$ll + sum(row_shift), 1e-11)
 
-shifted_em <- EM_fit(shifted_model, max_iter = 20, tol = -1)
+shifted_em <- EM_fit(
+  shifted_model, max_iter = 20, tol = -1,
+  allow_status_return = TRUE
+)
 assert_equal(shifted_em$delta, em_fit$delta, 1e-12)
 assert_equal(
   component_posteriors(shifted_em),
