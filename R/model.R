@@ -420,16 +420,204 @@ effective_penetrance_func <- function(model,
   effective_penetrance_from_moments(model, moments, prevalence)
 }
 
-posterior_gene_samples <- function(model, num_samples = 1) {
-  posteriors <- component_posterior_probabilities(model)
-  samples <- sapply(seq_len(nrow(posteriors)), function(gene) {
-    endpoints <- sample(
-      model$component_endpoints,
-      size = num_samples,
-      prob = posteriors[gene, ],
-      replace = TRUE
+#' Prepare a likelihood-conditioned gene posterior sampler
+#'
+#' Precomputes fitted component posterior probabilities for repeated sampling
+#' of continuous gene log rate ratios. The fitted model is not modified or
+#' refitted.
+#'
+#' @param fit A fitted `BurdenMLEDN_fit` object.
+#' @param input_data The same gene-level data used to fit `fit`, with rows in
+#'   exactly the same order. It must satisfy the input contract documented for
+#'   [BurdenMLE_DN()].
+#'
+#' @return A prepared sampler for use with [posterior_gene_samples()].
+#' @export
+posterior_gene_sampler <- function(fit, input_data) {
+  genetic_data <- process_data_trio(input_data)
+  required_fields <- c(
+    "component_endpoints", "delta", "features", "conditional_likelihood"
+  )
+  if (!is.list(fit) || any(!required_fields %in% names(fit))) {
+    stop("fit must be a fitted BurdenMLEDN model.")
+  }
+
+  fit_gene_ids <- rownames(fit$features)
+  if (is.null(fit_gene_ids) || anyNA(fit_gene_ids) ||
+      any(!nzchar(fit_gene_ids)) || anyDuplicated(fit_gene_ids)) {
+    stop("fit must contain unique, nonempty gene identities.")
+  }
+  likelihood_gene_ids <- rownames(fit$conditional_likelihood)
+  if (!is.null(likelihood_gene_ids) &&
+      !identical(likelihood_gene_ids, fit_gene_ids)) {
+    stop("fit contains inconsistent gene identities.")
+  }
+  if (!identical(rownames(genetic_data), fit_gene_ids)) {
+    stop(
+      "input_data gene row names must be identical to the fitted genes in the same order."
     )
-    runif(num_samples, min = pmin(0, endpoints), max = pmax(0, endpoints))
-  })
-  t(samples)
+  }
+  if (any(genetic_data$case_count > 0 & genetic_data$expected_count == 0)) {
+    stop("Genes with positive observed counts must have positive expected counts.")
+  }
+
+  posteriors <- component_posterior_probabilities(fit)
+  endpoints <- fit$component_endpoints
+  if (!is.numeric(endpoints) || length(endpoints) != ncol(posteriors) ||
+      anyNA(endpoints) || any(!is.finite(endpoints))) {
+    stop("fit contains invalid component endpoints.")
+  }
+  if (nrow(posteriors) != nrow(genetic_data)) {
+    stop("fit and input_data contain different numbers of genes.")
+  }
+
+  stored_data <- fit$posterior_gene_estimates
+  if (is.data.frame(stored_data) &&
+      all(c("Case_Count", "Expected_Count") %in% names(stored_data))) {
+    stored_matches <- identical(rownames(stored_data), fit_gene_ids) &&
+      identical(
+        as.numeric(stored_data$Case_Count),
+        as.numeric(genetic_data$case_count)
+      ) &&
+      isTRUE(all.equal(
+        as.numeric(stored_data$Expected_Count),
+        as.numeric(genetic_data$expected_count),
+        tolerance = 1e-12
+      ))
+    if (!stored_matches) {
+      stop("input_data counts do not match the data represented by fit.")
+    }
+  }
+
+  cumulative <- t(apply(posteriors, 1L, cumsum))
+  cumulative[cumulative < 0] <- 0
+  cumulative[cumulative > 1] <- 1
+  cumulative[, ncol(cumulative)] <- 1
+  dimnames(cumulative) <- list(fit_gene_ids, NULL)
+
+  structure(
+    list(
+      cumulative_component_probabilities = cumulative,
+      case_count = genetic_data$case_count,
+      expected_count = genetic_data$expected_count,
+      component_endpoints = endpoints,
+      gene_ids = fit_gene_ids
+    ),
+    class = c("BurdenMLEDN_posterior_sampler", "list")
+  )
+}
+
+sample_conditioned_log_rr <- function(case_count, expected_count, endpoint) {
+  if (!identical(length(case_count), length(expected_count)) ||
+      !identical(length(case_count), length(endpoint))) {
+    stop("Conditioned sampler inputs must have equal lengths.")
+  }
+  output <- numeric(length(endpoint))
+  active <- endpoint != 0
+  if (!any(active)) return(output)
+
+  count <- case_count[active]
+  expected <- expected_count[active]
+  upper_endpoint <- pmax(0, endpoint[active])
+  lower_endpoint <- pmin(0, endpoint[active])
+  if (any(count > 0 & expected == 0)) {
+    stop("Positive observed counts require positive expected counts.")
+  }
+
+  mode <- lower_endpoint
+  positive_count <- count > 0
+  mode[positive_count] <- pmin(
+    upper_endpoint[positive_count],
+    pmax(
+      lower_endpoint[positive_count],
+      log(count[positive_count]) - log(expected[positive_count])
+    )
+  )
+  log_density <- function(x) count * x - expected * exp(x)
+  maximum <- log_density(mode)
+
+  remaining <- seq_along(count)
+  accepted <- numeric(length(count))
+  while (length(remaining)) {
+    candidate <- runif(
+      length(remaining),
+      lower_endpoint[remaining],
+      upper_endpoint[remaining]
+    )
+    log_ratio <- count[remaining] * candidate -
+      expected[remaining] * exp(candidate) - maximum[remaining]
+    keep <- log(runif(length(remaining))) <= pmin(0, log_ratio)
+    if (any(keep)) accepted[remaining[keep]] <- candidate[keep]
+    remaining <- remaining[!keep]
+  }
+
+  output[active] <- accepted
+  output
+}
+
+#' Sample continuous gene effects from a fitted posterior
+#'
+#' Selects fitted mixture components from their gene-specific posterior
+#' probabilities, then samples each continuous log-rate-ratio effect from the
+#' Poisson likelihood conditioned on the selected component. Zero-width
+#' components remain point masses at zero. The function uses R's ambient RNG
+#' state and does not change or restore it.
+#'
+#' @param sampler A prepared sampler returned by [posterior_gene_sampler()].
+#' @param num_samples Number of independent samples per gene.
+#'
+#' @return A numeric gene-by-sample matrix. Rows are named with fitted gene
+#'   identities and columns are named `sample_1`, `sample_2`, and so on.
+#' @export
+posterior_gene_samples <- function(sampler, num_samples = 1) {
+  if (!inherits(sampler, "BurdenMLEDN_posterior_sampler")) {
+    stop("sampler must be created by posterior_gene_sampler().")
+  }
+  num_samples <- validate_positive_integer(num_samples, "num_samples")
+
+  cumulative <- sampler$cumulative_component_probabilities
+  no_genes <- length(sampler$gene_ids)
+  valid <- is.matrix(cumulative) && is.numeric(cumulative) &&
+    nrow(cumulative) == no_genes && ncol(cumulative) >= 1L &&
+    !anyNA(cumulative) && all(is.finite(cumulative)) &&
+    all(cumulative >= 0) && all(cumulative <= 1) &&
+    all(cumulative[, ncol(cumulative)] == 1) &&
+    (ncol(cumulative) == 1L || all(
+      cumulative[, -1, drop = FALSE] >=
+        cumulative[, -ncol(cumulative), drop = FALSE]
+    )) &&
+    is.character(sampler$gene_ids) && !anyNA(sampler$gene_ids) &&
+    all(nzchar(sampler$gene_ids)) && !anyDuplicated(sampler$gene_ids) &&
+    is.numeric(sampler$case_count) && is.numeric(sampler$expected_count) &&
+    is.numeric(sampler$component_endpoints) &&
+    length(sampler$case_count) == no_genes &&
+    length(sampler$expected_count) == no_genes &&
+    length(sampler$component_endpoints) == ncol(cumulative) &&
+    !anyNA(sampler$case_count) && all(is.finite(sampler$case_count)) &&
+    !anyNA(sampler$expected_count) && all(is.finite(sampler$expected_count)) &&
+    !anyNA(sampler$component_endpoints) &&
+    all(is.finite(sampler$component_endpoints))
+  if (!valid) stop("sampler is malformed; recreate it with posterior_gene_sampler().")
+
+  uniforms <- matrix(runif(no_genes * num_samples), nrow = no_genes)
+  component <- vapply(seq_len(num_samples), function(sample_index) {
+    as.integer(rowSums(cumulative <= uniforms[, sample_index]) + 1L)
+  }, integer(no_genes))
+  component <- matrix(component, nrow = no_genes, ncol = num_samples)
+  endpoints <- matrix(
+    sampler$component_endpoints[component],
+    nrow = no_genes,
+    ncol = num_samples
+  )
+  samples <- sample_conditioned_log_rr(
+    rep(sampler$case_count, num_samples),
+    rep(sampler$expected_count, num_samples),
+    as.vector(endpoints)
+  )
+  samples <- matrix(samples, nrow = no_genes, ncol = num_samples)
+  dimnames(samples) <- list(
+    sampler$gene_ids,
+    paste0("sample_", seq_len(num_samples))
+  )
+  samples
 }
