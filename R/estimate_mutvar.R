@@ -30,6 +30,7 @@ estimate_mutvar_trio <- function(model,
       prevalence * mean((rr_samples - 1)^2 * 2 * mutation_rate_samples) /
       (1 - prevalence)
   }, numeric(1))
+  names(annotation_mutvar) <- colnames(model$features)
 
   total_mutvar <- sum(annotation_mutvar)
   fraction_mutvar <- if (is.finite(total_mutvar) && total_mutvar > 0) {
@@ -37,9 +38,11 @@ estimate_mutvar_trio <- function(model,
   } else {
     rep(NA_real_, length(annotation_mutvar))
   }
+  names(fraction_mutvar) <- colnames(model$features)
   fraction_expected <- vapply(seq_len(ncol(model$features)), function(index) {
     sum(genetic_data$case_rate[model$features[, index] == 1])
   }, numeric(1)) / sum(genetic_data$case_rate)
+  names(fraction_expected) <- colnames(model$features)
 
   list(
     total_mutvar = total_mutvar,

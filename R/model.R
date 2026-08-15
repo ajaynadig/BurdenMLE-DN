@@ -3,7 +3,22 @@
 choose_component_endpoints_trio <- function(component_endpoints,
                                             no_cpts,
                                             prevalence) {
-  if (!is.null(component_endpoints)) return(component_endpoints)
+  if (!is.null(component_endpoints)) {
+    if (!is.numeric(component_endpoints) || !is.null(dim(component_endpoints)) ||
+        length(component_endpoints) < 2L || anyNA(component_endpoints) ||
+        any(!is.finite(component_endpoints)) ||
+        anyDuplicated(component_endpoints) || any(diff(component_endpoints) <= 0)) {
+      stop(
+        "component_endpoints must be a numeric vector of at least two finite, unique, strictly increasing values."
+      )
+    }
+    return(component_endpoints)
+  }
+  if (length(no_cpts) != 1L || !is.numeric(no_cpts) || is.na(no_cpts) ||
+      !is.finite(no_cpts) ||
+      no_cpts < 2 || no_cpts != as.integer(no_cpts)) {
+    stop("no_cpts must be one integer of at least 2.")
+  }
   effect_size_grid(prevalence = prevalence, no_cpts = no_cpts)
 }
 
@@ -27,13 +42,22 @@ initialize_model <- function(likelihood_function,
   no_cpts <- length(component_endpoints)
 
   if (is.null(features)) {
-    features <- matrix(1, nrow = nrow(genetic_data), ncol = 1)
-    rownames(features) <- rownames(genetic_data)
+    features <- matrix(
+      1,
+      nrow = nrow(genetic_data),
+      ncol = 1L,
+      dimnames = list(rownames(genetic_data), "all_genes")
+    )
   }
 
   list(
     component_endpoints = component_endpoints,
-    delta = matrix(1 / no_cpts, nrow = ncol(features), ncol = no_cpts),
+    delta = matrix(
+      1 / no_cpts,
+      nrow = ncol(features),
+      ncol = no_cpts,
+      dimnames = list(colnames(features), NULL)
+    ),
     conditional_likelihood = conditional_likelihood,
     conditional_log_likelihood = conditional_log_likelihood,
     likelihood_log_scale = likelihood_log_scale,

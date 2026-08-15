@@ -3,22 +3,6 @@
 # These functions are deliberately separate from EM.R so the established EM
 # implementation and its default behavior remain unchanged.
 
-validate_mixsqp_features <- function(features) {
-  if (!is.matrix(features)) {
-    features <- as.matrix(features)
-  }
-  if (anyNA(features) || any(!is.finite(features))) {
-    stop("MixSQP requires a finite, non-missing features matrix.")
-  }
-  if (!all(features %in% c(0, 1)) || !all(rowSums(features) == 1)) {
-    stop(
-      "MixSQP requires one-hot features: every row must contain exactly one 1 ",
-      "and otherwise only 0s. Use optimizer = \"EM\" for other feature designs."
-    )
-  }
-  invisible(features)
-}
-
 MixSQP_fit <- function(model,
                        control = list(),
                        return_likelihood = TRUE) {
@@ -29,7 +13,7 @@ MixSQP_fit <- function(model,
     )
   }
 
-  features <- validate_mixsqp_features(model$features)
+  features <- model$features
   conditional_likelihood <- model$conditional_likelihood
   no_cpts <- ncol(conditional_likelihood)
 

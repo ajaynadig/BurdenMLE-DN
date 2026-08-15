@@ -3,6 +3,7 @@ EM_fit <- function(model,
                    max_iter,
                    tol = 1e-6,
                    return_likelihood = TRUE) {
+  delta_dimnames <- dimnames(model$delta)
   #Pre-invert X_T %*% X to save time
   OLS_denom = solve(t(model$features) %*% model$features)
   OLS_denom_t_features <- OLS_denom %*% t(model$features)
@@ -38,6 +39,7 @@ EM_fit <- function(model,
   if (return_likelihood) {
     model$ll = ll
   }
+  dimnames(model$delta) <- delta_dimnames
 
   return(model)
 }

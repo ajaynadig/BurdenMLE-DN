@@ -4,15 +4,19 @@
 #' MixSQP. The input contains one row per gene and, at minimum, observed case
 #' counts and gene-specific mutation rates.
 #'
-#' @param input_data A data frame with one row per gene and columns
-#'   `case_count`, `case_rate`, and `N`. See
-#'   the repository's "Worked example" page.
-#' @param features Optional one-hot numeric matrix assigning genes to
-#'   annotation strata. Row names and order must match `input_data`.
+#' @param input_data A data frame with at least two genes; explicit, unique,
+#'   nonempty, non-missing gene row names; and columns `case_count`, `case_rate`,
+#'   and `N`. See the repository's "Worked example" page.
+#' @param features Optional finite one-hot numeric matrix assigning genes to
+#'   nonempty annotation strata. It must have explicit, unique, nonempty,
+#'   non-missing gene row names identical to `input_data` in the same order and
+#'   unique, nonempty, non-missing stratum column names. Reordered feature rows
+#'   fail rather than being realigned.
 #' @param component_endpoints Optional numeric vector of upper endpoints for
 #'   the uniform log-rate-ratio mixture components. Use
 #'   [effect_size_grid()] to construct prevalence-derived or conservatively
-#'   wide grids.
+#'   wide grids. When supplied, these endpoints take precedence and `no_cpts`
+#'   is ignored.
 #' @param no_cpts Number of mixture components when `component_endpoints` is
 #'   not supplied.
 #' @param grid_size Number of numerical-integration points per component.
@@ -37,7 +41,9 @@
 #'
 #' @return An object of class `BurdenMLEDN_fit`. Important fields include
 #'   `delta`, `component_endpoints`, `ll`, `mutvar_output`, `penetrance`,
-#'   `bootstrap_output`, and `optimizer_elapsed`.
+#'   `bootstrap_output`, and `optimizer_elapsed`. Stratum-indexed weights,
+#'   mutational-variance summaries, and confidence intervals retain the
+#'   feature-column names.
 #' @export
 #'
 #' @examples
@@ -79,17 +85,13 @@ BurdenMLE_DN <- function(input_data,
       !is.finite(prevalence) || prevalence <= 0 || prevalence >= 1) {
     stop("prevalence must be one finite number strictly between 0 and 1.")
   }
-  if (length(no_cpts) != 1L || no_cpts < 2 ||
-      no_cpts != as.integer(no_cpts)) {
-    stop("no_cpts must be one integer of at least 2.")
-  }
   if (length(grid_size) != 1L || grid_size < 1 ||
       grid_size != as.integer(grid_size)) {
     stop("grid_size must be one positive integer.")
   }
 
-  genetic_data = process_data_trio(input_data,
-                                   features)
+  genetic_data = process_data_trio(input_data)
+  features = validate_features_trio(genetic_data, features)
 
   component_endpoints = choose_component_endpoints_trio(component_endpoints,
                                                         no_cpts,
@@ -157,6 +159,7 @@ BurdenMLE_DN <- function(input_data,
   }
 
   if (mutvar_est) {
+    stratum_names <- colnames(model$features)
     #estimate mutvar in the full dataset
     model$mutvar_output = estimate_mutvar_trio(model = model,
                                                            genetic_data = genetic_data,
@@ -191,6 +194,7 @@ BurdenMLE_DN <- function(input_data,
                            function(i) {
                              quantile(bootstrap_annotmutvar_ests[i,],c(0.025,0.975))
                            })
+      colnames(annot_mutvar_CI) <- stratum_names
 
 
       bootstrap_fracmutvar_ests = sapply(1:length(bootstrap_mutvar_output), function(x) bootstrap_mutvar_output[[x]]$frac_mutvar)
@@ -202,10 +206,12 @@ BurdenMLE_DN <- function(input_data,
                               function(i) {
                                 quantile(bootstrap_fracmutvar_ests[i,],c(0.025,0.975))
                               })
+        colnames(fracmutvar_CI) <- stratum_names
         enrich_CI = sapply(1:nrow(bootstrap_enrich_ests),
                            function(i) {
                              quantile(bootstrap_enrich_ests[i,],c(0.025,0.975))
                            })
+        colnames(enrich_CI) <- stratum_names
       } else {
         warning(
           "At least one bootstrap replicate has zero total mutational variance; ",
@@ -214,11 +220,11 @@ BurdenMLE_DN <- function(input_data,
         )
         fracmutvar_CI = matrix(
           NA_real_, nrow = 2, ncol = nrow(bootstrap_fracmutvar_ests),
-          dimnames = list(c("2.5%", "97.5%"), rownames(bootstrap_fracmutvar_ests))
+          dimnames = list(c("2.5%", "97.5%"), stratum_names)
         )
         enrich_CI = matrix(
           NA_real_, nrow = 2, ncol = nrow(bootstrap_enrich_ests),
-          dimnames = list(c("2.5%", "97.5%"), rownames(bootstrap_enrich_ests))
+          dimnames = list(c("2.5%", "97.5%"), stratum_names)
         )
       }
       model$mutvar_output$mutvar_CI = mutvar_CI
