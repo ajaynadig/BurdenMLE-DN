@@ -52,8 +52,9 @@ not supplied.}
 \item{grid_size}{Number of numerical-integration points per component.}
 
 \item{mutvar_est}{Compute mutational variance and annotation summaries.
-This requires \code{case_rate}; expected-count-only inputs must set this to
-\code{FALSE}.}
+This uses deterministic analytic moments of the continuous-uniform
+components and requires \code{case_rate}; expected-count-only inputs must set
+this to \code{FALSE}.}
 
 \item{max_iter, max_iter_boot, tol}{Controls retained for the optional legacy
 optimizer.}

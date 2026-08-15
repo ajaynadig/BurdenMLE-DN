@@ -23,8 +23,9 @@
 #'   not supplied.
 #' @param grid_size Number of numerical-integration points per component.
 #' @param mutvar_est Compute mutational variance and annotation summaries.
-#'   This requires `case_rate`; expected-count-only inputs must set this to
-#'   `FALSE`.
+#'   This uses deterministic analytic moments of the continuous-uniform
+#'   components and requires `case_rate`; expected-count-only inputs must set
+#'   this to `FALSE`.
 #' @param max_iter,max_iter_boot,tol Controls retained for the optional legacy
 #'   optimizer.
 #' @param prevalence Population prevalence on the 0--1 scale. Required when
