@@ -37,11 +37,6 @@ read_csv <- function(path) {
   if (!file.exists(path)) stop("Required derived output is missing: ", path)
   read.csv(path, check.names = FALSE, stringsAsFactors = FALSE)
 }
-latest_file <- function(directory, pattern) {
-  paths <- sort(list.files(directory, pattern = pattern, full.names = TRUE))
-  if (!length(paths)) stop("No file matching ", pattern, " in ", directory)
-  tail(paths, 1)
-}
 relative_path <- function(path) {
   normalized <- normalizePath(path, mustWork = FALSE)
   prefix <- paste0(normalizePath(final_runs_dir), "/")
@@ -126,19 +121,22 @@ posterior_summary <- readRDS(posterior_summary_file)
 
 source(file.path(repo_dir, "R", "io.R"))
 source(file.path(repo_dir, "analysis", "scripts", "secondary_analysis_functions.R"))
-model_data_dir <- file.path(outputs_dir, "data")
-autism_model_file <- get_arg(
-  "--autism-model-file",
-  latest_file(model_data_dir, "^models_autism_mixsqp_.*\\.Rdata$")
-)
-ddd_model_file <- get_arg(
-  "--ddd-model-file",
-  latest_file(model_data_dir, "^models_ddd_mixsqp_.*\\.Rdata$")
-)
+source(file.path(repo_dir, "analysis", "scripts", "model_artifacts.R"))
+model_manifest <- get_arg("--model-manifest", NA_character_)
+legacy_autism_file <- get_arg("--legacy-autism-model-file", NA_character_)
+legacy_ddd_file <- get_arg("--legacy-ddd-model-file", NA_character_)
 autism_env <- new.env(parent = globalenv())
 ddd_env <- new.env(parent = globalenv())
-load(autism_model_file, envir = autism_env)
-load(ddd_model_file, envir = ddd_env)
+autism_info <- load_model_artifact(
+  model_manifest, "autism", envir = autism_env,
+  legacy_path = legacy_autism_file
+)
+ddd_info <- load_model_artifact(
+  model_manifest, "ddd", envir = ddd_env,
+  legacy_path = legacy_ddd_file
+)
+autism_model_file <- autism_info$path
+ddd_model_file <- ddd_info$path
 
 # E[(exp(U)-1)^2] for U ~ Uniform(0, endpoint). This is the deterministic
 # version of the mutational-variance moment already used in the prevalence

@@ -24,23 +24,13 @@ script_file <- normalizePath(script_file, mustWork = TRUE)
 repo_dir <- dirname(dirname(script_file))
 final_runs_dir <- normalizePath(Sys.getenv("BURDENMLEDN_ANALYSIS_ROOT", unset = file.path(repo_dir, "analysis")), mustWork = FALSE)
 
-model_candidates <- sort(list.files(
-  file.path(final_runs_dir, "outputs", "data"),
-  pattern = "^models_autism_mixsqp_.*\\.Rdata$",
-  full.names = TRUE
-))
-model_file <- get_arg(
-  "--model-file",
-  if (length(model_candidates)) tail(model_candidates, 1) else NA_character_
-)
+model_manifest <- get_arg("--model-manifest", NA_character_)
+legacy_model_file <- get_arg("--legacy-model-file", NA_character_)
 output_dir <- get_arg(
   "--output-dir",
   file.path(final_runs_dir, "outputs", "derived", "main_autism")
 )
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
-
-if (is.na(model_file) || !file.exists(model_file))
-  stop("No main autism MixSQP model file was found: ", model_file)
 
 source_files <- c(
   "BurdenMLE_DN.R", "estimate_mutvar.R", "io.R", "likelihoods.R",
@@ -49,7 +39,12 @@ source_files <- c(
 for (source_file in source_files) {
   source(if (identical(source_file, "secondary_analysis_functions.R")) file.path(repo_dir, "analysis", "scripts", source_file) else file.path(repo_dir, "R", source_file))
 }
-load(model_file)
+source(file.path(repo_dir, "analysis", "scripts", "model_artifacts.R"))
+artifact_info <- load_model_artifact(
+  model_manifest, "autism", envir = environment(),
+  legacy_path = legacy_model_file
+)
+model_file <- artifact_info$path
 
 if (!exists("autism_data") || !exists("BurdenMLE_DN_models_autism")) {
   stop("The model file must contain autism_data and BurdenMLE_DN_models_autism.")

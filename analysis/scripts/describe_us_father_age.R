@@ -5,6 +5,15 @@
 
 library(ggplot2)
 
+args <- commandArgs(trailingOnly = TRUE)
+get_arg <- function(flag, default) {
+  hit <- grep(paste0("^", flag, "="), args, value = TRUE)
+  if (length(hit)) return(sub(paste0("^", flag, "="), "", hit[1]))
+  index <- match(flag, args)
+  if (!is.na(index)) return(args[index + 1])
+  default
+}
+
 year <- 2024
 source_url <- paste0(
   "https://ftp.cdc.gov/pub/Health_Statistics/NCHS/Datasets/DVS/natality/",
@@ -29,6 +38,15 @@ figure_dir <- file.path(final_runs_dir, "outputs", "figures", "diagnostics", "pa
 dir.create(input_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
+
+source(file.path(repo_dir, "analysis", "scripts", "model_artifacts.R"))
+model_environment <- new.env(parent = globalenv())
+artifact_info <- load_model_artifact(
+  get_arg("--model-manifest", NA_character_), "autism",
+  envir = model_environment,
+  legacy_path = get_arg("--legacy-model-file", NA_character_)
+)
+model_file <- artifact_info$path
 
 zip_file <- file.path(input_dir, paste0("Nat", year, "us.zip"))
 if (!file.exists(zip_file)) {
@@ -296,23 +314,13 @@ write.csv(
   row.names = FALSE
 )
 
-# Apply the proportional correction to the main MixSQP PTV and Mis2 estimates
-# when that model output is present. Model indices are matched by name because
+# Apply the proportional correction to the selected PTV and Mis2 estimates.
+# Model indices are matched by name because
 # the streamlined model list may change order.
-model_files <- list.files(
-  file.path(final_runs_dir, "outputs", "data"),
-  pattern = "^models_autism_mixsqp_.*\\.Rdata$",
-  full.names = TRUE
-)
-if (length(model_files) > 0) {
-  model_file <- model_files[which.max(file.info(model_files)$mtime)]
-  model_environment <- new.env(parent = emptyenv())
-  load(model_file, envir = model_environment)
-
-  model_names <- model_environment$autism_data$loop_vars$names
-  target_names <- c("Combined Probands PTV", "Combined Probands Mis2")
-  target_indices <- match(target_names, model_names)
-  if (!anyNA(target_indices)) {
+model_names <- model_environment$autism_data$loop_vars$names
+target_names <- c("Combined Probands PTV", "Combined Probands Mis2")
+target_indices <- match(target_names, model_names)
+if (!anyNA(target_indices)) {
     reported_mutvar <- vapply(
       target_indices,
       function(index) {
@@ -340,7 +348,6 @@ if (length(model_files) > 0) {
       file.path(table_dir, "spark_paternal_age_mutvar_sensitivity.csv"),
       row.names = FALSE
     )
-  }
 }
 
 print(mutation_sensitivity, row.names = FALSE)

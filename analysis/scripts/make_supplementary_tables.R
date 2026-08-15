@@ -18,30 +18,31 @@ get_arg <- function(flag, default) {
 script_file <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1])
 repo_dir <- dirname(dirname(normalizePath(script_file, mustWork = TRUE)))
 final_runs_dir <- normalizePath(Sys.getenv("BURDENMLEDN_ANALYSIS_ROOT", unset = file.path(repo_dir, "analysis")), mustWork = FALSE)
-data_dir <- file.path(final_runs_dir, "outputs", "data")
 derived_dir <- file.path(final_runs_dir, "outputs", "derived")
 output_dir <- get_arg(
   "--output-dir", file.path(final_runs_dir, "outputs", "tables", "supplementary")
 )
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
-latest_file <- function(pattern) {
-  candidates <- sort(list.files(data_dir, pattern = pattern, full.names = TRUE))
-  if (!length(candidates)) stop("No file matched ", pattern)
-  tail(candidates, 1)
-}
-autism_model_file <- get_arg(
-  "--autism-model-file", latest_file("^models_autism_mixsqp_.*\\.Rdata$"))
-ddd_model_file <- get_arg(
-  "--ddd-model-file", latest_file("^models_ddd_mixsqp_.*\\.Rdata$"))
+model_manifest <- get_arg("--model-manifest", NA_character_)
+legacy_autism_file <- get_arg("--legacy-autism-model-file", NA_character_)
+legacy_ddd_file <- get_arg("--legacy-ddd-model-file", NA_character_)
 
 for (source_file in c(
   "BurdenMLE_DN.R", "estimate_mutvar.R", "io.R", "likelihoods.R",
   "model.R", "secondary_analysis_functions.R"
 )) source(if (identical(source_file, "secondary_analysis_functions.R")) file.path(repo_dir, "analysis", "scripts", source_file) else file.path(repo_dir, "R", source_file))
-
-load(autism_model_file)
-load(ddd_model_file)
+source(file.path(repo_dir, "analysis", "scripts", "model_artifacts.R"))
+autism_info <- load_model_artifact(
+  model_manifest, "autism", envir = environment(),
+  legacy_path = legacy_autism_file
+)
+ddd_info <- load_model_artifact(
+  model_manifest, "ddd", envir = environment(),
+  legacy_path = legacy_ddd_file
+)
+autism_model_file <- autism_info$path
+ddd_model_file <- ddd_info$path
 
 write_tsv <- function(x, filename) {
   write.table(x, file.path(output_dir, filename), sep = "\t", quote = FALSE,

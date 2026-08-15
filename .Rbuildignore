@@ -2,6 +2,7 @@
 ^\.git$
 ^\.gitignore$
 ^analysis$
+^tests/artifact_contracts\.R$
 ^data-raw$
 ^tools$
 ^wiki$

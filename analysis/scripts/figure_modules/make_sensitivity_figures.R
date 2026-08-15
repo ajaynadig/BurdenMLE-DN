@@ -16,7 +16,6 @@ script_file <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = 
 script_file <- normalizePath(script_file, mustWork = TRUE)
 repo_dir <- dirname(dirname(script_file))
 final_runs_dir <- normalizePath(Sys.getenv("BURDENMLEDN_ANALYSIS_ROOT", unset = file.path(repo_dir, "analysis")), mustWork = FALSE)
-data_dir <- file.path(final_runs_dir, "outputs", "data")
 figure_dir <- get_arg(
   "--figure-dir", file.path(final_runs_dir, "outputs", "figures", "supplementary")
 )
@@ -49,19 +48,15 @@ palette_variantclass <- c(
   "PTV" = "#FF5F8A", "Mis2" = "darkorange", "Mis1" = "#F9B332",
   "Mis0" = "#EFD09F", "Syn" = "grey50"
 )
-latest_model <- function(pattern, explicit, label) {
-  candidates <- sort(list.files(data_dir, pattern = pattern, full.names = TRUE))
-  path <- get_arg(explicit, if (length(candidates)) tail(candidates, 1) else NA_character_)
-  if (is.na(path) || !file.exists(path)) stop("No ", label, " model output found.")
-  path
-}
-
 # CES-gene exclusion sensitivity: original two-panel plot.
-no_ces_file <- latest_model(
-  "^models_autism_noCES_.*\\.Rdata$", "--no-ces-model-file", "no-CES"
-)
 no_ces_env <- new.env(parent = globalenv())
-load(no_ces_file, envir = no_ces_env)
+source(file.path(repo_dir, "analysis", "scripts", "model_artifacts.R"))
+no_ces_info <- load_model_artifact(
+  get_arg("--no-ces-model-manifest", NA_character_), "no_ces",
+  envir = no_ces_env,
+  legacy_path = get_arg("--legacy-no-ces-model-file", NA_character_)
+)
+no_ces_file <- no_ces_info$path
 no_ces_table <- mutvar_enrichment_table(
   no_ces_env$autism_data, no_ces_env$BurdenMLE_DN_models_autism_noCES
 )$mutvar
