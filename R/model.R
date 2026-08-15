@@ -420,20 +420,7 @@ effective_penetrance_func <- function(model,
   effective_penetrance_from_moments(model, moments, prevalence)
 }
 
-#' Prepare a likelihood-conditioned gene posterior sampler
-#'
-#' Precomputes fitted component posterior probabilities for repeated sampling
-#' of continuous gene log rate ratios. The fitted model is not modified or
-#' refitted.
-#'
-#' @param fit A fitted `BurdenMLEDN_fit` object.
-#' @param input_data The same gene-level data used to fit `fit`, with rows in
-#'   exactly the same order. It must satisfy the input contract documented for
-#'   [BurdenMLE_DN()].
-#'
-#' @return A prepared sampler for use with [posterior_gene_samples()].
-#' @export
-posterior_gene_sampler <- function(fit, input_data) {
+validate_fit_input_data <- function(fit, input_data) {
   genetic_data <- process_data_trio(input_data)
   required_fields <- c(
     "component_endpoints", "delta", "features", "conditional_likelihood"
@@ -461,16 +448,6 @@ posterior_gene_sampler <- function(fit, input_data) {
     stop("Genes with positive observed counts must have positive expected counts.")
   }
 
-  posteriors <- component_posterior_probabilities(fit)
-  endpoints <- fit$component_endpoints
-  if (!is.numeric(endpoints) || length(endpoints) != ncol(posteriors) ||
-      anyNA(endpoints) || any(!is.finite(endpoints))) {
-    stop("fit contains invalid component endpoints.")
-  }
-  if (nrow(posteriors) != nrow(genetic_data)) {
-    stop("fit and input_data contain different numbers of genes.")
-  }
-
   stored_data <- fit$posterior_gene_estimates
   if (is.data.frame(stored_data) &&
       all(c("Case_Count", "Expected_Count") %in% names(stored_data))) {
@@ -487,6 +464,78 @@ posterior_gene_sampler <- function(fit, input_data) {
     if (!stored_matches) {
       stop("input_data counts do not match the data represented by fit.")
     }
+  }
+
+  list(genetic_data = genetic_data, gene_ids = fit_gene_ids)
+}
+
+#' Calculate mutation-weighted effective penetrance
+#'
+#' Calculates average penetrance among the excess risk attributable to the
+#' modeled variant class, weighting genes by their per-haploid mutation rates.
+#' This is distinct from the gene-average `penetrance$effective_penetrance`
+#' stored by [BurdenMLE_DN()]. It is computed only when this function is called.
+#'
+#' @param fit A fitted `BurdenMLEDN_fit` object with a valid stored prevalence.
+#' @param input_data The same gene-level data used to fit `fit`, in the same
+#'   gene order, including `case_rate`.
+#'
+#' @return One mutation-weighted effective-penetrance estimate.
+#' @export
+mutation_weighted_effective_penetrance <- function(fit, input_data) {
+  if (!inherits(fit, "BurdenMLEDN_fit")) {
+    stop("fit must be a BurdenMLEDN_fit.")
+  }
+  validated <- validate_fit_input_data(fit, input_data)
+  genetic_data <- validated$genetic_data
+  if (!"case_rate" %in% names(genetic_data)) {
+    stop("mutation-weighted effective penetrance requires input_data$case_rate.")
+  }
+  prevalence <- fit$prevalence
+  if (length(prevalence) != 1L || !is.numeric(prevalence) ||
+      is.na(prevalence) || !is.finite(prevalence) ||
+      prevalence <= 0 || prevalence >= 1) {
+    stop("fit must contain one finite prevalence strictly between 0 and 1.")
+  }
+
+  moments <- precompute_effective_penetrance_moments(fit, genetic_data)
+  posteriors <- component_posterior_probabilities(fit)
+  numerator <- sum(
+    genetic_data$case_rate * rowSums(posteriors * moments$numerator)
+  )
+  denominator <- sum(
+    genetic_data$case_rate * rowSums(posteriors * moments$denominator)
+  )
+  if (!is.finite(denominator) || denominator == 0) return(NA_real_)
+  prevalence * numerator / denominator
+}
+
+#' Prepare a likelihood-conditioned gene posterior sampler
+#'
+#' Precomputes fitted component posterior probabilities for repeated sampling
+#' of continuous gene log rate ratios. The fitted model is not modified or
+#' refitted.
+#'
+#' @param fit A fitted `BurdenMLEDN_fit` object.
+#' @param input_data The same gene-level data used to fit `fit`, with rows in
+#'   exactly the same order. It must satisfy the input contract documented for
+#'   [BurdenMLE_DN()].
+#'
+#' @return A prepared sampler for use with [posterior_gene_samples()].
+#' @export
+posterior_gene_sampler <- function(fit, input_data) {
+  validated <- validate_fit_input_data(fit, input_data)
+  genetic_data <- validated$genetic_data
+  fit_gene_ids <- validated$gene_ids
+
+  posteriors <- component_posterior_probabilities(fit)
+  endpoints <- fit$component_endpoints
+  if (!is.numeric(endpoints) || length(endpoints) != ncol(posteriors) ||
+      anyNA(endpoints) || any(!is.finite(endpoints))) {
+    stop("fit contains invalid component endpoints.")
+  }
+  if (nrow(posteriors) != nrow(genetic_data)) {
+    stop("fit and input_data contain different numbers of genes.")
   }
 
   cumulative <- t(apply(posteriors, 1L, cumsum))

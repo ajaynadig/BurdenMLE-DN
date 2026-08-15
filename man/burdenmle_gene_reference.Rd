@@ -12,6 +12,7 @@ A data frame with one row per gene.
 \description{
 Loads a public, count-free reference table containing gene identifiers,
 LOEUF strata, and gene-level coding mutation rates used to construct the
-manuscript's baseline annotation features. No cohort variant or count data
-are included.
+manuscript's baseline annotation features. Logical schema, mutation-rate,
+ordering, and stratum invariants are checked when the data are loaded. No
+cohort variant or count data are included.
 }
