@@ -28,17 +28,21 @@ BurdenMLE_DN(
 )
 }
 \arguments{
-\item{input_data}{A data frame with one row per gene and columns
-\code{case_count}, \code{case_rate}, and \code{N}. See
-the repository's "Worked example" page.}
+\item{input_data}{A data frame with at least two genes; explicit, unique,
+nonempty, non-missing gene row names; and columns \code{case_count}, \code{case_rate},
+and \code{N}. See the repository's "Worked example" page.}
 
-\item{features}{Optional one-hot numeric matrix assigning genes to
-annotation strata. Row names and order must match \code{input_data}.}
+\item{features}{Optional finite one-hot numeric matrix assigning genes to
+nonempty annotation strata. It must have explicit, unique, nonempty,
+non-missing gene row names identical to \code{input_data} in the same order and
+unique, nonempty, non-missing stratum column names. Reordered feature rows
+fail rather than being realigned.}
 
 \item{component_endpoints}{Optional numeric vector of upper endpoints for
 the uniform log-rate-ratio mixture components. Use
 \code{\link[=effect_size_grid]{effect_size_grid()}} to construct prevalence-derived or conservatively
-wide grids.}
+wide grids. When supplied, these endpoints take precedence and \code{no_cpts}
+is ignored.}
 
 \item{no_cpts}{Number of mixture components when \code{component_endpoints} is
 not supplied.}
@@ -79,7 +83,9 @@ the requested component grid.}
 \value{
 An object of class \code{BurdenMLEDN_fit}. Important fields include
 \code{delta}, \code{component_endpoints}, \code{ll}, \code{mutvar_output}, \code{penetrance},
-\code{bootstrap_output}, and \code{optimizer_elapsed}.
+\code{bootstrap_output}, and \code{optimizer_elapsed}. Stratum-indexed weights,
+mutational-variance summaries, and confidence intervals retain the
+feature-column names.
 }
 \description{
 Fits a discrete-mixture model to gene-level de novo variant counts using

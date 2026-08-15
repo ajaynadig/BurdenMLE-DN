@@ -1,6 +1,7 @@
 # Output fields
 
-`BurdenMLE_DN()` returns a `BurdenMLEDN_fit` list. The most useful fields are:
+`BurdenMLE_DN()` returns a `BurdenMLEDN_fit` list. All stratum-indexed outputs
+retain the feature-column names and order. The most useful fields are:
 
 | Field | Availability | Description |
 |---|---|---|

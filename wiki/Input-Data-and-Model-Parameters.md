@@ -2,8 +2,8 @@
 
 ## Input table
 
-`BurdenMLE_DN()` accepts a data frame with one row per gene, unique gene row
-names, and three required columns:
+`BurdenMLE_DN()` accepts a data frame with at least two genes, explicit,
+unique, nonempty, non-missing gene row names, and three required columns:
 
 | Field | Meaning |
 |---|---|
@@ -14,11 +14,13 @@ names, and three required columns:
 The expected count under no association is computed as
 `2 * N * case_rate`. Rows with missing or non-finite values are rejected.
 
-For stratified models, `features` is a one-hot numeric matrix with one row per
-gene. Its row names and order must match the input table. Each column defines
-an annotation stratum with its own mixture weights. Although an unstratified
-fit is supported, substantive analyses should generally include biologically
-relevant gene annotations. Our baseline analyses used LOEUF strata.
+For stratified models, `features` must be a finite one-hot numeric matrix with
+one row per gene. Its unique, nonempty, non-missing row names must be identical
+to the input gene names in the same order; reordered rows fail rather than
+being silently realigned. Columns must have unique, nonempty, non-missing
+names, every row must assign its gene to exactly one stratum, and every stratum
+must contain a gene. The same contract applies to MixSQP and EM. Omitting
+`features` fits one stratum named `all_genes`.
 
 ## Principal model parameters
 
@@ -26,7 +28,7 @@ relevant gene annotations. Our baseline analyses used LOEUF strata.
 |---|---|---|
 | `prevalence` | Population prevalence used for effect grid and derived estimates | required |
 | `no_cpts` | Number of mixture components | 10 |
-| `component_endpoints` | Optional explicit upper endpoints on the log-rate-ratio scale | prevalence-dependent grid |
+| `component_endpoints` | Optional finite, unique, strictly increasing upper endpoints on the log-rate-ratio scale; takes precedence over `no_cpts` | prevalence-dependent grid |
 | `grid_size` | Integration points per uniform component | 10 |
 | `bootstrap`, `n_boot` | Gene-level nonparametric bootstrap and replicate count | `TRUE`, 100 |
 | `null_sim`, `n_null` | Optional parametric null simulation and replicate count | `FALSE`, 100 when enabled |
