@@ -1,8 +1,7 @@
 library(SummarizedExperiment)
 
 # Derive the cohort-by-sex quantities used in Figure 2G-H. The estimands and
-# bootstrap resampling match visualization_trio.R; only repeated Monte Carlo
-# integration is replaced with its exact uniform-mixture expectation.
+# bootstrap resampling match visualization_trio.R.
 
 args <- commandArgs(trailingOnly = TRUE)
 get_arg <- function(flag, default) {
@@ -47,24 +46,13 @@ mis2_model <- get_model(mis2_name)
 ptv_data <- get_data(ptv_name)
 mis2_data <- get_data(mis2_name)
 
-uniform_exp_mean <- function(endpoint, multiplier) {
-  z <- multiplier * endpoint
-  ifelse(abs(z) < 1e-12, 1, expm1(z) / z)
-}
-
 exact_mutvar <- function(model, genetic_data, prevalence, gamma_scaling_factor = 1) {
-  component_moment <-
-    uniform_exp_mean(model$component_endpoints, 2 * gamma_scaling_factor) -
-    2 * uniform_exp_mean(model$component_endpoints, gamma_scaling_factor) + 1
-  annotation_mutvar <- vapply(seq_len(ncol(model$features)), function(annotation) {
-    rows <- model$features[, annotation] == 1
-    weights <- model$delta[annotation, ]
-    weights[weights < 0] <- 0
-    weights <- weights / sum(weights)
-    sum(rows) * prevalence * mean(2 * genetic_data$case_rate[rows]) *
-      sum(weights * component_moment) / (1 - prevalence)
-  }, numeric(1))
-  sum(annotation_mutvar)
+  estimate_mutvar_trio(
+    model,
+    genetic_data,
+    prevalence,
+    gamma_scaling_factor
+  )$total_mutvar
 }
 
 posterior_grid <- function(model, genetic_data) {

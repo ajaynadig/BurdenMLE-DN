@@ -34,20 +34,8 @@ for (source_file in c(
 load(model_file)
 model_index <- setNames(seq_along(autism_data$loop_vars$names), autism_data$loop_vars$names)
 
-uniform_exp_mean <- function(endpoint, multiplier) {
-  z <- multiplier * endpoint
-  ifelse(abs(z) < 1e-12, 1, expm1(z) / z)
-}
 exact_mutvar <- function(model, genetic_data, prevalence) {
-  moment <- uniform_exp_mean(model$component_endpoints, 2) -
-    2 * uniform_exp_mean(model$component_endpoints, 1) + 1
-  sum(vapply(seq_len(ncol(model$features)), function(annotation) {
-    rows <- model$features[, annotation] == 1
-    weights <- pmax(model$delta[annotation, ], 0)
-    weights <- weights / sum(weights)
-    sum(rows) * prevalence * mean(2 * genetic_data$case_rate[rows]) *
-      sum(weights * moment) / (1 - prevalence)
-  }, numeric(1)))
+  estimate_mutvar_trio(model, genetic_data, prevalence)$total_mutvar
 }
 posterior_grid <- function(model, genetic_data) {
   component_posterior <- (model$features %*% model$delta) * model$conditional_likelihood

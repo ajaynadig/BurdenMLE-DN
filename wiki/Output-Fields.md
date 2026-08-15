@@ -10,7 +10,7 @@ retain the feature-column names and order. The most useful fields are:
 | `ll` | When `return_likelihood = TRUE` | Maximized log likelihood, useful for fit diagnostics and optimizer comparisons on identical data and grids. |
 | `optimizer_elapsed` | Always | Elapsed seconds for the full fit and, when requested, the complete bootstrap fitting stage. |
 | `input_summary` | Always | Input gene/count totals, sample size (`NA` when `N` was not supplied), and whether `case_rate` is available. |
-| `mutvar_output$total_mutvar` | When `mutvar_est = TRUE` | Total observed-scale coding mutational variance summed across annotation strata. |
+| `mutvar_output$total_mutvar` | When `mutvar_est = TRUE` | Total observed-scale coding mutational variance summed across annotation strata using deterministic analytic moments of the continuous-uniform components. |
 | `mutvar_output$mutvar_CI` | With bootstrap and mutational variance | Percentile-bootstrap 95% interval for total mutational variance. |
 | `mutvar_output$annot_mutvar` | When `mutvar_est = TRUE` | Absolute contribution to mutational variance from each annotation stratum. |
 | `mutvar_output$annot_mutvar_CI` | With bootstrap and mutational variance | Stratum-specific percentile-bootstrap 95% intervals for absolute mutational variance. |
