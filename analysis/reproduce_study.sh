@@ -10,7 +10,8 @@ set -euo pipefail
 #
 # Stages are opt-in so an accidental invocation never starts a long model run.
 # Example full figure rebuild from existing model outputs:
-#   RUN_SIMULATION_ANALYSIS=true RUN_MAIN_FIGURES=true RUN_FORECASTING=true \
+#   RUN_DATE=Aug15_26 RUN_SIMULATION_ANALYSIS=true \
+#   RUN_MAIN_FIGURES=true RUN_FORECASTING=true \
 #   RUN_AUTISM_DD_FIGURES=true RUN_SUPPLEMENTARY_FIGURES=true \
 #   RUN_SUPPLEMENTARY_TABLES=true bash .../reproduce_study.sh
 
@@ -33,6 +34,9 @@ if ! command -v "${R_BIN}" >/dev/null 2>&1; then
 fi
 
 RUN_DATE="${RUN_DATE:-$(date '+%b%d_%y')}"
+MAIN_MODEL_MANIFEST="${MAIN_MODEL_MANIFEST:-${FINAL_RUNS_DIR}/outputs/data/model_manifest_main_${RUN_DATE}.rds}"
+NO_CES_MODEL_MANIFEST="${NO_CES_MODEL_MANIFEST:-${FINAL_RUNS_DIR}/outputs/data/model_manifest_no_ces_${RUN_DATE}.rds}"
+NO_OVERLAP_MODEL_MANIFEST="${NO_OVERLAP_MODEL_MANIFEST:-${FINAL_RUNS_DIR}/outputs/data/model_manifest_no_overlap_${RUN_DATE}.rds}"
 SIMULATION_SEED="${SIMULATION_SEED:-20260715}"
 BOOTSTRAPS="${BOOTSTRAPS:-100}"
 MODEL_SEED="${MODEL_SEED:-24312342}"
@@ -151,9 +155,11 @@ fi
 
 if [[ "${RUN_MAIN_FIGURES}" == "true" ]]; then
   run_step "summarize_main_autism" \
-    "${R_BIN}" "${SCRIPT_DIR}/summarize_main_autism.R"
+    "${R_BIN}" "${SCRIPT_DIR}/summarize_main_autism.R" \
+    --model-manifest "${MAIN_MODEL_MANIFEST}"
   run_step "summarize_cohort_sex" \
-    "${R_BIN}" "${SCRIPT_DIR}/summarize_cohort_sex.R"
+    "${R_BIN}" "${SCRIPT_DIR}/summarize_cohort_sex.R" \
+    --model-manifest "${MAIN_MODEL_MANIFEST}"
   run_step "make_figure2" \
     "${R_BIN}" "${SCRIPT_DIR}/make_figure2_cohort_sex.R"
 fi
@@ -161,6 +167,7 @@ fi
 if [[ "${RUN_FORECASTING}" == "true" ]]; then
   run_step "forecast_gene_discovery" \
     "${R_BIN}" "${SCRIPT_DIR}/forecasting_script_revision.R" \
+    --model-manifest "${MAIN_MODEL_MANIFEST}" \
     --seed "${MODEL_SEED}" \
     --cores "${FORECAST_CORES:-1}"
   run_step "make_forecasting_figures" \
@@ -169,39 +176,49 @@ fi
 
 if [[ "${RUN_AUTISM_DD_FIGURES}" == "true" ]]; then
   run_step "summarize_autism_dd" \
-    "${R_BIN}" "${SCRIPT_DIR}/summarize_autism_dd.R"
+    "${R_BIN}" "${SCRIPT_DIR}/summarize_autism_dd.R" \
+    --model-manifest "${MAIN_MODEL_MANIFEST}"
   run_step "make_figure4_autism_dd" \
     "${R_BIN}" "${SCRIPT_DIR}/make_figure4_autism_dd.R"
   run_step "summarize_autism_dd_prevalence" \
-    "${R_BIN}" "${SCRIPT_DIR}/summarize_autism_dd_prevalence.R"
+    "${R_BIN}" "${SCRIPT_DIR}/summarize_autism_dd_prevalence.R" \
+    --model-manifest "${MAIN_MODEL_MANIFEST}"
 fi
 
 if [[ "${RUN_SUPPLEMENTARY_FIGURES}" == "true" ]]; then
   run_step "summarize_secondary_autism" \
-    "${R_BIN}" "${SCRIPT_DIR}/summarize_secondary_autism.R"
+    "${R_BIN}" "${SCRIPT_DIR}/summarize_secondary_autism.R" \
+    --model-manifest "${MAIN_MODEL_MANIFEST}"
   run_step "summarize_posterior_diagnostics" \
-    "${R_BIN}" "${SCRIPT_DIR}/summarize_posterior_diagnostics.R"
+    "${R_BIN}" "${SCRIPT_DIR}/summarize_posterior_diagnostics.R" \
+    --model-manifest "${MAIN_MODEL_MANIFEST}"
   run_step "summarize_ddid" \
     "${R_BIN}" "${SCRIPT_DIR}/summarize_ddid.R" \
+    --model-manifest "${MAIN_MODEL_MANIFEST}" \
     --cores "${SECONDARY_CORES:-1}"
   run_step "summarize_no_overlap" \
-    "${R_BIN}" "${SCRIPT_DIR}/summarize_no_overlap.R"
+    "${R_BIN}" "${SCRIPT_DIR}/summarize_no_overlap.R" \
+    --model-manifest "${NO_OVERLAP_MODEL_MANIFEST}"
   run_step "describe_us_father_age" \
-    "${R_BIN}" "${SCRIPT_DIR}/describe_us_father_age.R"
+    "${R_BIN}" "${SCRIPT_DIR}/describe_us_father_age.R" \
+    --model-manifest "${MAIN_MODEL_MANIFEST}"
   run_step "compare_spark_us_father_age" \
     "${R_BIN}" "${SCRIPT_DIR}/compare_spark_us_father_age.R"
   run_step "make_supplementary_figures" \
-    "${R_BIN}" "${SCRIPT_DIR}/make_supplementary_figures.R"
+    "${R_BIN}" "${SCRIPT_DIR}/make_supplementary_figures.R" \
+    --no-ces-model-manifest "${NO_CES_MODEL_MANIFEST}"
 fi
 
 if [[ "${RUN_SUPPLEMENTARY_TABLES}" == "true" ]]; then
   run_step "make_supplementary_tables" \
-    "${R_BIN}" "${SCRIPT_DIR}/make_supplementary_tables.R"
+    "${R_BIN}" "${SCRIPT_DIR}/make_supplementary_tables.R" \
+    --model-manifest "${MAIN_MODEL_MANIFEST}"
 fi
 
 if [[ "${RUN_MANUSCRIPT_ESTIMATES}" == "true" ]]; then
   run_step "make_manuscript_estimate_table" \
-    "${R_BIN}" "${SCRIPT_DIR}/make_manuscript_estimate_table.R"
+    "${R_BIN}" "${SCRIPT_DIR}/make_manuscript_estimate_table.R" \
+    --model-manifest "${MAIN_MODEL_MANIFEST}"
 fi
 
 echo

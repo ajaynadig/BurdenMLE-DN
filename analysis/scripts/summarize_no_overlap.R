@@ -14,20 +14,8 @@ script_file <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = 
 script_file <- normalizePath(script_file, mustWork = TRUE)
 repo_dir <- dirname(dirname(script_file))
 final_runs_dir <- normalizePath(Sys.getenv("BURDENMLEDN_ANALYSIS_ROOT", unset = file.path(repo_dir, "analysis")), mustWork = FALSE)
-data_dir <- file.path(final_runs_dir, "outputs", "data")
-latest_no_overlap <- function() {
-  candidates <- list.files(
-    data_dir,
-    pattern = "^models_autism_no_overlap_mixsqp_.*\\.Rdata$",
-    full.names = TRUE
-  )
-  if (!length(candidates)) {
-    stop("No dated no-overlap MixSQP model file was found in ", data_dir)
-  }
-  candidates[which.max(file.info(candidates)$mtime)]
-}
-model_file <- get_arg("--model-file", NA_character_)
-if (is.na(model_file)) model_file <- latest_no_overlap()
+model_manifest <- get_arg("--model-manifest", NA_character_)
+legacy_model_file <- get_arg("--legacy-model-file", NA_character_)
 figure4_summary_file <- get_arg(
   "--figure4-summary-file", file.path(final_runs_dir, "outputs", "derived", "autism_dd", "figure4_summary.rds")
 )
@@ -35,9 +23,14 @@ output_dir <- get_arg(
   "--output-dir", file.path(final_runs_dir, "outputs", "derived", "sensitivities")
 )
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
-for (path in c(model_file, figure4_summary_file)) if (!file.exists(path)) stop("Required input not found: ", path)
+if (!file.exists(figure4_summary_file)) stop("Required input not found: ", figure4_summary_file)
 for (source_file in c("io.R", "secondary_analysis_functions.R")) source(if (identical(source_file, "secondary_analysis_functions.R")) file.path(repo_dir, "analysis", "scripts", source_file) else file.path(repo_dir, "R", source_file))
-load(model_file)
+source(file.path(repo_dir, "analysis", "scripts", "model_artifacts.R"))
+artifact_info <- load_model_artifact(
+  model_manifest, "no_overlap", envir = environment(),
+  legacy_path = legacy_model_file
+)
+model_file <- artifact_info$path
 main_comparison <- readRDS(figure4_summary_file)
 data <- autism_data_NoKaplanis
 fitted_models <- BurdenMLE_DN_models_autism_NoKaplanis

@@ -15,26 +15,29 @@ script_file <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = 
 script_file <- normalizePath(script_file, mustWork = TRUE)
 repo_dir <- dirname(dirname(script_file))
 final_runs_dir <- normalizePath(Sys.getenv("BURDENMLEDN_ANALYSIS_ROOT", unset = file.path(repo_dir, "analysis")), mustWork = FALSE)
-latest <- function(pattern) {
-  paths <- sort(list.files(file.path(final_runs_dir, "outputs", "data"),
-                           pattern = pattern, full.names = TRUE))
-  if (!length(paths)) return(NA_character_)
-  tail(paths, 1)
-}
-autism_file <- get_arg("--autism-model-file", latest("^models_autism_mixsqp_.*\\.Rdata$"))
-ddd_file <- get_arg("--ddd-model-file", latest("^models_ddd_mixsqp_.*\\.Rdata$"))
+model_manifest <- get_arg("--model-manifest", NA_character_)
+legacy_autism_file <- get_arg("--legacy-autism-model-file", NA_character_)
+legacy_ddd_file <- get_arg("--legacy-ddd-model-file", NA_character_)
 output_dir <- get_arg(
   "--output-dir", file.path(final_runs_dir, "outputs", "derived", "autism_dd")
 )
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
-for (path in c(autism_file, ddd_file)) if (is.na(path) || !file.exists(path)) stop("Model not found: ", path)
 for (source_file in c("io.R", "secondary_analysis_functions.R")) {
   source(if (identical(source_file, "secondary_analysis_functions.R")) file.path(repo_dir, "analysis", "scripts", source_file) else file.path(repo_dir, "R", source_file))
 }
 autism_env <- new.env(parent = globalenv())
 ddd_env <- new.env(parent = globalenv())
-load(autism_file, envir = autism_env)
-load(ddd_file, envir = ddd_env)
+source(file.path(repo_dir, "analysis", "scripts", "model_artifacts.R"))
+autism_info <- load_model_artifact(
+  model_manifest, "autism", envir = autism_env,
+  legacy_path = legacy_autism_file
+)
+ddd_info <- load_model_artifact(
+  model_manifest, "ddd", envir = ddd_env,
+  legacy_path = legacy_ddd_file
+)
+autism_file <- autism_info$path
+ddd_file <- ddd_info$path
 
 effect_moment <- function(endpoints) {
   out <- numeric(length(endpoints))

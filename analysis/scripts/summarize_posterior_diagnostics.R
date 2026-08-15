@@ -14,13 +14,8 @@ script_file <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = 
 script_file <- normalizePath(script_file, mustWork = TRUE)
 repo_dir <- dirname(dirname(script_file))
 final_runs_dir <- normalizePath(Sys.getenv("BURDENMLEDN_ANALYSIS_ROOT", unset = file.path(repo_dir, "analysis")), mustWork = FALSE)
-model_candidates <- sort(list.files(
-  file.path(final_runs_dir, "outputs", "data"),
-  pattern = "^models_autism_mixsqp_.*\\.Rdata$", full.names = TRUE
-))
-model_file <- get_arg(
-  "--model-file", if (length(model_candidates)) tail(model_candidates, 1) else NA_character_
-)
+model_manifest <- get_arg("--model-manifest", NA_character_)
+legacy_model_file <- get_arg("--legacy-model-file", NA_character_)
 reference_file <- get_arg(
   "--reference-file",
   file.path(final_runs_dir, "inputs", "reference", "full_results_ASD_all_NPDs_2026-03-04.txt")
@@ -33,14 +28,19 @@ output_dir <- get_arg(
   "--output-dir", file.path(final_runs_dir, "outputs", "derived", "main_autism")
 )
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
-for (path in c(model_file, reference_file, constraint_file)) {
+for (path in c(reference_file, constraint_file)) {
   if (is.na(path) || !file.exists(path)) stop("Required input not found: ", path)
 }
 for (source_file in c("BurdenMLE_DN.R", "io.R", "model.R",
                       "secondary_analysis_functions.R")) {
   source(if (identical(source_file, "secondary_analysis_functions.R")) file.path(repo_dir, "analysis", "scripts", source_file) else file.path(repo_dir, "R", source_file))
 }
-load(model_file)
+source(file.path(repo_dir, "analysis", "scripts", "model_artifacts.R"))
+artifact_info <- load_model_artifact(
+  model_manifest, "autism", envir = environment(),
+  legacy_path = legacy_model_file
+)
+model_file <- artifact_info$path
 model_index <- setNames(seq_along(autism_data$loop_vars$names), autism_data$loop_vars$names)
 ptv_index <- model_index[["Combined Probands PTV"]]
 if (is.na(ptv_index)) stop("Combined Probands PTV model is missing.")

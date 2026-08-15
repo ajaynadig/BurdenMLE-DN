@@ -12,6 +12,7 @@ if (is.null(script_file)) {
 script_file <- normalizePath(script_file, mustWork = TRUE)
 repo_dir <- dirname(dirname(dirname(script_file)))
 source(file.path(repo_dir, "analysis", "scripts", "run_models_cli.R"))
+source(file.path(repo_dir, "analysis", "scripts", "model_artifacts.R"))
 config <- parse_run_models_args(args)
 if (isTRUE(config$help)) {
   cat(run_models_help())
@@ -136,6 +137,7 @@ fit_BurdenMLE_DN_models <- function(data,
 
 current_date <- run_date
 optimizer_suffix <- if (optimizer == "EM") "" else paste0("_", tolower(optimizer))
+artifact_paths <- character()
 
 if ((analysis_mode == "main" && run_autism) ||
     analysis_mode %in% c("no_ces", "test")) {
@@ -167,13 +169,15 @@ if (analysis_mode == "main") {
       bootstrap_count = n_bootstraps,
       optimizer = optimizer
     )
+    autism_artifact_path <- file.path(
+      output_data_dir,
+      paste0("models_autism", optimizer_suffix, "_", current_date, ".Rdata")
+    )
     save(
       BurdenMLE_DN_models_autism, autism_data,
-      file = file.path(
-        output_data_dir,
-        paste0("models_autism", optimizer_suffix, "_", current_date, ".Rdata")
-      )
+      file = autism_artifact_path
     )
+    artifact_paths["autism"] <- autism_artifact_path
   }
 
   if (run_ddd) {
@@ -185,13 +189,15 @@ if (analysis_mode == "main") {
       bootstrap_count = n_bootstraps,
       optimizer = optimizer
     )
+    ddd_artifact_path <- file.path(
+      output_data_dir,
+      paste0("models_ddd", optimizer_suffix, "_", current_date, ".Rdata")
+    )
     save(
       BurdenMLE_DN_models_DDD, kaplanis_data,
-      file = file.path(
-        output_data_dir,
-        paste0("models_ddd", optimizer_suffix, "_", current_date, ".Rdata")
-      )
+      file = ddd_artifact_path
     )
+    artifact_paths["ddd"] <- ddd_artifact_path
   }
 }
 
@@ -207,16 +213,18 @@ if (analysis_mode == "age") {
   )
   autism_data_AgePhenos <- autism_data
   autism_counts_AgePhenos <- autism_counts
+  age_artifact_path <- file.path(
+    output_data_dir,
+    paste0("models_autism_AgePhenos", optimizer_suffix, "_", current_date, ".Rdata")
+  )
   save(
     BurdenMLE_DN_models_autism_AgePhenos,
     autism_data_AgePhenos,
     autism_counts_AgePhenos,
     age_phenotypes_spark,
-    file = file.path(
-      output_data_dir,
-      paste0("models_autism_AgePhenos", optimizer_suffix, "_", current_date, ".Rdata")
-    )
+    file = age_artifact_path
   )
+  artifact_paths["age"] <- age_artifact_path
 }
 
 if (analysis_mode == "no_ces") {
@@ -254,13 +262,15 @@ if (analysis_mode == "no_ces") {
     optimizer = optimizer,
     genes_to_keep = genes_to_keep
   )
+  no_ces_artifact_path <- file.path(
+    output_data_dir,
+    paste0("models_autism_noCES", optimizer_suffix, "_", current_date, ".Rdata")
+  )
   save(
     BurdenMLE_DN_models_autism_noCES, autism_data, ces_gene_ids,
-    file = file.path(
-      output_data_dir,
-      paste0("models_autism_noCES", optimizer_suffix, "_", current_date, ".Rdata")
-    )
+    file = no_ces_artifact_path
   )
+  artifact_paths["no_ces"] <- no_ces_artifact_path
 }
 
 if (analysis_mode == "no_overlap") {
@@ -275,15 +285,17 @@ if (analysis_mode == "no_overlap") {
   )
   autism_data_NoKaplanis <- autism_data
   autism_counts_NoKaplanis <- autism_counts
+  no_overlap_artifact_path <- file.path(
+    output_data_dir,
+    paste0("models_autism_no_overlap", optimizer_suffix, "_", current_date, ".Rdata")
+  )
   save(
     BurdenMLE_DN_models_autism_NoKaplanis,
     autism_data_NoKaplanis,
     autism_counts_NoKaplanis,
-    file = file.path(
-      output_data_dir,
-      paste0("models_autism_no_overlap", optimizer_suffix, "_", current_date, ".Rdata")
-    )
+    file = no_overlap_artifact_path
   )
+  artifact_paths["no_overlap"] <- no_overlap_artifact_path
 }
 
 if (analysis_mode == "test") {
@@ -301,13 +313,15 @@ if (analysis_mode == "test") {
     bootstrap_count = n_bootstraps,
     optimizer = optimizer
   )
+  test_artifact_path <- file.path(
+    output_data_dir,
+    paste0("models_autism_test", optimizer_suffix, "_", current_date, ".Rdata")
+  )
   save(
     BurdenMLE_DN_models_autism_test, autism_data,
-    file = file.path(
-      output_data_dir,
-      paste0("models_autism_test", optimizer_suffix, "_", current_date, ".Rdata")
-    )
+    file = test_artifact_path
   )
+  artifact_paths["test"] <- test_artifact_path
 
   test_summary <- mutvar_enrichment_table(
     autism_data, BurdenMLE_DN_models_autism_test
@@ -360,3 +374,25 @@ if (analysis_mode == "test") {
     test_figure, device = cairo_pdf, width = 11, height = 4.5
   )
 }
+
+manifest_path <- write_model_manifest(
+  path = file.path(
+    output_data_dir,
+    paste0("model_manifest_", analysis_mode, "_", current_date, ".rds")
+  ),
+  run_id = current_date,
+  mode = analysis_mode,
+  repo_dir = repo_dir,
+  settings = list(
+    optimizer = optimizer,
+    seed = random_seed,
+    grid_size = 10L,
+    bootstrap_count = n_bootstraps,
+    max_effect_size = list(
+      autism = autism_max_effect_size,
+      ddd = ddd_max_effect_size
+    )
+  ),
+  artifacts = artifact_paths
+)
+cat("Model manifest written to", manifest_path, "\n")

@@ -12,13 +12,8 @@ script_file <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = 
 script_file <- normalizePath(script_file, mustWork = TRUE)
 repo_dir <- dirname(dirname(script_file))
 final_runs_dir <- normalizePath(Sys.getenv("BURDENMLEDN_ANALYSIS_ROOT", unset = file.path(repo_dir, "analysis")), mustWork = FALSE)
-ddd_candidates <- sort(list.files(
-  file.path(final_runs_dir, "outputs", "data"),
-  pattern = "^models_ddd_mixsqp_.*\\.Rdata$", full.names = TRUE
-))
-ddd_model_file <- get_arg(
-  "--ddd-model-file", if (length(ddd_candidates)) tail(ddd_candidates, 1) else NA_character_
-)
+model_manifest <- get_arg("--model-manifest", NA_character_)
+legacy_model_file <- get_arg("--legacy-model-file", NA_character_)
 autism_summary_file <- get_arg(
   "--autism-summary-file",
   file.path(final_runs_dir, "outputs", "derived", "main_autism", "figure2_summary.rds")
@@ -27,13 +22,17 @@ output_dir <- get_arg(
   "--output-dir", file.path(final_runs_dir, "outputs", "derived", "autism_dd")
 )
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
-if (is.na(ddd_model_file) || !file.exists(ddd_model_file)) stop("DDD model not found.")
 if (!file.exists(autism_summary_file)) stop("Autism summary not found.")
 for (source_file in c(
   "BurdenMLE_DN.R", "estimate_mutvar.R", "io.R", "likelihoods.R",
   "model.R", "secondary_analysis_functions.R"
 )) source(if (identical(source_file, "secondary_analysis_functions.R")) file.path(repo_dir, "analysis", "scripts", source_file) else file.path(repo_dir, "R", source_file))
-load(ddd_model_file)
+source(file.path(repo_dir, "analysis", "scripts", "model_artifacts.R"))
+artifact_info <- load_model_artifact(
+  model_manifest, "ddd", envir = environment(),
+  legacy_path = legacy_model_file
+)
+ddd_model_file <- artifact_info$path
 autism_summary <- readRDS(autism_summary_file)
 
 ddd_index <- setNames(seq_along(kaplanis_data$loop_vars$names), kaplanis_data$loop_vars$names)

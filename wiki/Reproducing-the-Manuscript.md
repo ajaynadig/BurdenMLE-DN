@@ -24,6 +24,17 @@ the supplied analysis root. Every stage is separately selectable through the
 `RUN_*` variables documented in
 [`analysis/README.md`](../analysis/README.md).
 
+Every model-producing mode also writes
+`outputs/data/model_manifest_<mode>_<run-date>.rds`. Downstream stages load the
+exact artifact named in that manifest and validate its saved objects, gene
+order, full-fit status, and uncertainty status; they never choose a model by
+sorting filenames. Consumer-only reruns can select existing manifests with
+`MAIN_MODEL_MANIFEST`, `NO_CES_MODEL_MANIFEST`, and
+`NO_OVERLAP_MODEL_MANIFEST`. Unreliable bootstrap uncertainty warns without
+blocking a usable fit. Historical unmanifested files require an explicit
+`--legacy-...-model-file` option and always warn because their modern status
+and gene-universe contracts cannot be reconstructed.
+
 This separation is deliberate: users can install and test the method with
 synthetic data, while controlled study data remain outside Git and under the
 governance of the flagship manuscript authors.

@@ -18,14 +18,8 @@ script_file <- normalizePath(script_file, mustWork = TRUE)
 repo_dir <- dirname(dirname(script_file))
 final_runs_dir <- normalizePath(Sys.getenv("BURDENMLEDN_ANALYSIS_ROOT", unset = file.path(repo_dir, "analysis")), mustWork = FALSE)
 
-model_candidates <- sort(list.files(
-  file.path(final_runs_dir, "outputs", "data"),
-  pattern = "^models_autism_mixsqp_.*\\.Rdata$", full.names = TRUE
-))
-model_file <- get_arg(
-  "--model-file",
-  if (length(model_candidates)) tail(model_candidates, 1) else NA_character_
-)
+model_manifest <- get_arg("--model-manifest", NA_character_)
+legacy_model_file <- get_arg("--legacy-model-file", NA_character_)
 output_dir <- get_arg(
   "--output-dir", file.path(final_runs_dir, "outputs", "derived", "forecasting")
 )
@@ -34,14 +28,17 @@ n_points <- as.integer(get_arg("--points", 20))
 seed <- as.integer(get_arg("--seed", 24312342))
 cores <- as.integer(get_arg("--cores", 1))
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
-if (is.na(model_file) || !file.exists(model_file)) stop("Main autism model not found.")
-
 source_files <- c(
   "BurdenMLE_DN.R", "estimate_mutvar.R", "io.R", "likelihoods.R",
   "model.R", "secondary_analysis_functions.R"
 )
 for (source_file in source_files) source(if (identical(source_file, "secondary_analysis_functions.R")) file.path(repo_dir, "analysis", "scripts", source_file) else file.path(repo_dir, "R", source_file))
-load(model_file)
+source(file.path(repo_dir, "analysis", "scripts", "model_artifacts.R"))
+artifact_info <- load_model_artifact(
+  model_manifest, "autism", envir = environment(),
+  legacy_path = legacy_model_file
+)
+model_file <- artifact_info$path
 
 model_index <- setNames(seq_along(autism_data$loop_vars$names), autism_data$loop_vars$names)
 required <- c(
