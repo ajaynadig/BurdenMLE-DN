@@ -5,87 +5,29 @@ library(pbapply)
 
 args <- commandArgs(trailingOnly = TRUE)
 
-if ("--help" %in% args) {
-  cat(
-    "Options:\n",
-    "  --mode <main|age|no_ces|no_overlap|test> Analysis mode (default: main)\n",
-    "  --run-autism <true|false>            Run autism models in main mode\n",
-    "  --run-ddd <true|false>                Run DDD models in main mode\n",
-    "  --bootstraps <positive integer>       Number of bootstrap samples\n",
-    "  --seed <integer>                      Random seed\n",
-    "  --run-date <label>                    Shared analysis-run label\n",
-    "  --autism-max-effect-size <number>     Autism component upper bound\n",
-    "  --ddd-max-effect-size <number>        DDD component upper bound\n",
-    "  --optimizer <EM|mixsqp>               Model optimizer (default: EM)\n",
-    sep = ""
-  )
-  quit(status = 0)
-}
-
-get_arg <- function(flag, default) {
-  equals_match <- grep(paste0("^", flag, "="), args, value = TRUE)
-  if (length(equals_match) > 0) {
-    return(sub(paste0("^", flag, "="), "", equals_match[1]))
-  }
-  flag_index <- match(flag, args)
-  if (!is.na(flag_index)) {
-    if (flag_index == length(args) || startsWith(args[flag_index + 1], "--")) {
-      stop("Missing value after ", flag)
-    }
-    return(args[flag_index + 1])
-  }
-  default
-}
-
-as_flag <- function(value, name) {
-  normalized <- tolower(value)
-  if (!normalized %in% c("true", "false")) {
-    stop(name, " must be true or false.")
-  }
-  normalized == "true"
-}
-
-analysis_mode <- get_arg("--mode", "main")
-run_autism <- as_flag(get_arg("--run-autism", "true"), "--run-autism")
-run_ddd <- as_flag(get_arg("--run-ddd", "true"), "--run-ddd")
-n_bootstraps <- as.integer(get_arg("--bootstraps", "100"))
-random_seed <- as.integer(get_arg("--seed", "24312342"))
-run_date <- get_arg("--run-date", format(Sys.Date(), "%b%d_%y"))
-autism_max_effect_size <- as.numeric(
-  get_arg("--autism-max-effect-size", "100")
-)
-ddd_max_effect_size <- as.numeric(get_arg("--ddd-max-effect-size", "250"))
-optimizer <- get_arg("--optimizer", "EM")
-if (tolower(optimizer) == "mixsqp") {
-  optimizer <- "mixsqp"
-} else if (tolower(optimizer) == "em") {
-  optimizer <- "EM"
-} else {
-  stop("--optimizer must be EM or mixsqp.")
-}
-
-if (is.na(n_bootstraps) || n_bootstraps < 1) {
-  stop("--bootstraps must be a positive integer.")
-}
-if (is.na(random_seed)) {
-  stop("--seed must be an integer.")
-}
-if (!grepl("^[A-Za-z0-9_-]+$", run_date)) {
-  stop("--run-date may contain only letters, numbers, underscores, and hyphens.")
-}
-if (is.na(autism_max_effect_size) || autism_max_effect_size <= 1 ||
-    is.na(ddd_max_effect_size) || ddd_max_effect_size <= 1) {
-  stop("Maximum effect sizes must be numeric values greater than 1.")
-}
-
-set.seed(random_seed)
-
 script_file <- tryCatch(sys.frame(1)$ofile, error = function(e) NULL)
 if (is.null(script_file)) {
   script_file <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1])
 }
 script_file <- normalizePath(script_file, mustWork = TRUE)
-repo_dir <- dirname(dirname(script_file))
+repo_dir <- dirname(dirname(dirname(script_file)))
+source(file.path(repo_dir, "analysis", "scripts", "run_models_cli.R"))
+config <- parse_run_models_args(args)
+if (isTRUE(config$help)) {
+  cat(run_models_help())
+  quit(status = 0)
+}
+analysis_mode <- config$analysis_mode
+run_autism <- config$run_autism
+run_ddd <- config$run_ddd
+n_bootstraps <- config$n_bootstraps
+random_seed <- config$random_seed
+run_date <- config$run_date
+autism_max_effect_size <- config$autism_max_effect_size
+ddd_max_effect_size <- config$ddd_max_effect_size
+optimizer <- config$optimizer
+set.seed(random_seed)
+
 final_runs_dir <- normalizePath(Sys.getenv("BURDENMLEDN_ANALYSIS_ROOT", unset = file.path(repo_dir, "analysis")), mustWork = FALSE)
 input_dir <- file.path(final_runs_dir, "inputs")
 output_data_dir <- file.path(final_runs_dir, "outputs", "data")
@@ -99,14 +41,6 @@ source_files <- c(
 )
 for (source_file in source_files) {
   source(if (identical(source_file, "secondary_analysis_functions.R")) file.path(repo_dir, "analysis", "scripts", source_file) else file.path(repo_dir, "R", source_file))
-}
-
-valid_modes <- c("main", "age", "no_ces", "no_overlap", "test")
-if (!analysis_mode %in% valid_modes) {
-  stop("analysis_mode must be one of: ", paste(valid_modes, collapse = ", "))
-}
-if (!run_autism && (!run_ddd || analysis_mode != "main")) {
-  stop("No analysis is selected to run.")
 }
 
 fit_BurdenMLE_DN_models <- function(data,

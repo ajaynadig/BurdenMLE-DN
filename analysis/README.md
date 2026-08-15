@@ -24,5 +24,9 @@ with the `RUN_*` variables declared near the top of `reproduce_study.sh`.
 `RUN_DATE`, seeds, bootstrap counts, and R executable can also be set as
 environment variables.
 
+Manual `run_models.R` invocations default to the package's MixSQP optimizer.
+Use `--optimizer EM` to request the retained legacy optimizer explicitly. The
+simulation workflow intentionally invokes both optimizers for comparison.
+
 The scripts are released for transparency and exact reproduction. The
 installable package and synthetic example do not require manuscript inputs.

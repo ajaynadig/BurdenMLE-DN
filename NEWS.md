@@ -1,5 +1,11 @@
 # BurdenMLEDN 0.1.1
 
+- Corrected public one-sided p-values to include ties and added a finite-null
+  plus-one correction.
+- Clarified that the default effective-penetrance output is gene averaged and
+  added an explicit opt-in mutation-weighted estimator.
+- Added invariant validation for the bundled public gene reference and aligned
+  the manual model-fitting optimizer default with MixSQP.
 - Added a prepared gene posterior sampler that draws continuous effects from
   the Poisson likelihood within each selected fitted mixture component.
 - Standardized full, bootstrap, and null fit status across MixSQP and EM;

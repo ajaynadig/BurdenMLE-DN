@@ -89,7 +89,9 @@ RNG state is restored.}
 
 \item{estimate_posteriors}{Compute gene-level posterior summaries.}
 
-\item{estimate_effective_penetrance}{Compute effective penetrance.}
+\item{estimate_effective_penetrance}{Compute gene-average effective
+penetrance. The distinct mutation-weighted estimand is available through
+\code{\link[=mutation_weighted_effective_penetrance]{mutation_weighted_effective_penetrance()}}.}
 
 \item{optimizer}{Optimization routine. MixSQP is the supported default.}
 
@@ -112,6 +114,12 @@ summaries, and confidence intervals retain the feature-column names.
 Fits a discrete-mixture model to gene-level de novo variant counts using
 MixSQP. The input contains one row per gene, observed case counts, and either
 exact expected counts or the mutation-rate inputs needed to derive them.
+}
+\details{
+Gene-level Poisson p-values are inclusive one-sided probabilities,
+\code{P(X >= observed)}. When null simulation and mutational variance are both
+requested, the finite-null p-value includes ties and uses a plus-one
+correction, so its minimum is \code{1 / (n_null + 1)}.
 }
 \examples{
 example_file <- system.file("extdata", "synthetic_example.csv",

@@ -1,3 +1,7 @@
+inclusive_finite_null_pvalue <- function(null_values, observed_value) {
+  (1 + sum(null_values >= observed_value)) / (length(null_values) + 1)
+}
+
 #' Fit a BurdenMLE-DN model
 #'
 #' Fits a discrete-mixture model to gene-level de novo variant counts using
@@ -46,11 +50,18 @@
 #'   RNG state is restored.
 #' @param return_likelihood Store the maximized log likelihood.
 #' @param estimate_posteriors Compute gene-level posterior summaries.
-#' @param estimate_effective_penetrance Compute effective penetrance.
+#' @param estimate_effective_penetrance Compute gene-average effective
+#'   penetrance. The distinct mutation-weighted estimand is available through
+#'   [mutation_weighted_effective_penetrance()].
 #' @param optimizer Optimization routine. MixSQP is the supported default.
 #' @param mixsqp_control Named list passed to `mixsqp::mixsqp()`. Package
 #'   defaults preserve small components and scale the active-set allowance to
 #'   the requested component grid.
+#'
+#' @details Gene-level Poisson p-values are inclusive one-sided probabilities,
+#'   `P(X >= observed)`. When null simulation and mutational variance are both
+#'   requested, the finite-null p-value includes ties and uses a plus-one
+#'   correction, so its minimum is `1 / (n_null + 1)`.
 #'
 #' @return An object of class `BurdenMLEDN_fit`. Important fields include
 #'   `delta`, `component_endpoints`, `ll`, `fit_status`,
@@ -353,8 +364,9 @@ BurdenMLE_DN <- function(input_data,
                              })
 
       model$mutvar_output$null_mutvar_ests = null_mutvar_ests
-      model$mutvar_output$mutvar_p = mean(
-        model$mutvar_output$null_mutvar_ests > model$mutvar_output$total_mutvar
+      model$mutvar_output$mutvar_p <- inclusive_finite_null_pvalue(
+        model$mutvar_output$null_mutvar_ests,
+        model$mutvar_output$total_mutvar
       )
     }
 
@@ -367,7 +379,7 @@ BurdenMLE_DN <- function(input_data,
     RR_naive = genetic_data$case_count / genetic_data$expected_count
 
     #get some simple poisson p values
-    RR_poisson_p = ppois(genetic_data$case_count,
+    RR_poisson_p = ppois(genetic_data$case_count - 1,
                          genetic_data$expected_count,
                          lower.tail = FALSE)
 

@@ -8,7 +8,8 @@ burdenmle_loeuf_strata()
 }
 \value{
 A data frame describing the six baseline annotation strata, their
-gene counts, and observed LOEUF ranges in the bundled reference.
+gene counts, and observed LOEUF ranges in the bundled reference. Its
+counts and ranges are checked against the gene reference when loaded.
 }
 \description{
 Load the BurdenMLE-DN LOEUF strata summary
