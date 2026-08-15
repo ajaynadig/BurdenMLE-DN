@@ -9,6 +9,7 @@ retain the feature-column names and order. The most useful fields are:
 | `component_endpoints` | Always | Upper log-rate-ratio endpoint of each uniform mixture component. Exponentiate these values to recover rate-ratio endpoints. |
 | `ll` | When `return_likelihood = TRUE` | Maximized log likelihood, useful for fit diagnostics and optimizer comparisons on identical data and grids. |
 | `optimizer_elapsed` | Always | Elapsed seconds for the full fit and, when requested, the complete bootstrap fitting stage. |
+| `input_summary` | Always | Input gene/count totals, sample size (`NA` when `N` was not supplied), and whether `case_rate` is available. |
 | `mutvar_output$total_mutvar` | When `mutvar_est = TRUE` | Total observed-scale coding mutational variance summed across annotation strata. |
 | `mutvar_output$mutvar_CI` | With bootstrap and mutational variance | Percentile-bootstrap 95% interval for total mutational variance. |
 | `mutvar_output$annot_mutvar` | When `mutvar_est = TRUE` | Absolute contribution to mutational variance from each annotation stratum. |

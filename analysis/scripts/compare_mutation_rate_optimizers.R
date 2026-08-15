@@ -30,6 +30,7 @@ calibration_data <- data.frame(
   gene_id = gnomad$gene_id[keep]
 )
 calibration_data <- calibration_data[complete.cases(calibration_data), ]
+rownames(calibration_data) <- calibration_data$gene_id
 
 fit_calibration <- function(optimizer, max_iter = 1000, tol = 1e-6) {
   elapsed <- system.time({
