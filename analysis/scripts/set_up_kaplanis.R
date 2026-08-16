@@ -113,8 +113,14 @@ resolve_duplicate_names_prior_to_collecting_by_gene_id <- function(input_table) 
 
 print("Data File: kaplanis_variants_GRCh38_annotated_formatted_2024-11-23.txt")
 
-kaplanis_data <- read.table("count_data_update_April2025/kaplanis_variants_GRCh38_annotated_formatted_2024-11-23.txt", header = TRUE)
-sex_info <- read.table("count_data_update_April2025/fordist_joint_dnm_ID_sex_2019_08_30.txt", header = TRUE)
+kaplanis_data <- read.table(
+  file.path(resource_dir, "kaplanis_variants_GRCh38_annotated_formatted_2024-11-23.txt"),
+  header = TRUE
+)
+sex_info <- read.table(
+  file.path(resource_dir, "fordist_joint_dnm_ID_sex_2019_08_30.txt"),
+  header = TRUE
+)
 
 #get the PTV nonindel : PTV ratio
 
@@ -123,7 +129,7 @@ num_ptv = sum(kaplanis_data$isPTV[!is.na(kaplanis_data$isPTV)])
 
 kaplanis_ptv_scale_factor = num_ptv/num_ptv_nonindel
 
-mutation_rate_table = read.table("count_data_update_April2025/ASD_gene_table_w_bespoke_mutation_rates_2024-07-24.txt",
+mutation_rate_table = read.table(file.path(resource_dir, "ASD_gene_table_w_bespoke_mutation_rates_2024-07-24.txt"),
                                  header = TRUE,
                                  sep = "\t")
 kaplanis_data_fixedID <- resolve_duplicate_names_prior_to_collecting_by_gene_id(kaplanis_data)
