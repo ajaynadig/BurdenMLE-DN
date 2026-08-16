@@ -12,9 +12,12 @@ get_arg <- function(flag, default) {
   if (!is.na(i)) return(args[i + 1])
   default
 }
-script_file <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1])
-script_file <- normalizePath(script_file, mustWork = TRUE)
-repo_dir <- dirname(dirname(script_file))
+repo_dir <- get0("repo_dir", envir = parent.env(environment()), inherits = TRUE)
+if (is.null(repo_dir)) {
+  script_file <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1])
+  script_file <- normalizePath(script_file, mustWork = TRUE)
+  repo_dir <- dirname(dirname(dirname(dirname(script_file))))
+}
 final_runs_dir <- normalizePath(Sys.getenv("BURDENMLEDN_ANALYSIS_ROOT", unset = file.path(repo_dir, "analysis")), mustWork = FALSE)
 figure_dir <- get_arg(
   "--figure-dir", file.path(final_runs_dir, "outputs", "figures", "supplementary")

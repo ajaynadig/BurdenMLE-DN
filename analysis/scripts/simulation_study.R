@@ -50,7 +50,7 @@ script_file <- sub(
   grep("^--file=", commandArgs(FALSE), value = TRUE)[1]
 )
 script_file <- normalizePath(script_file, mustWork = TRUE)
-repo_dir <- dirname(dirname(script_file))
+repo_dir <- dirname(dirname(dirname(script_file)))
 final_runs_dir <- normalizePath(Sys.getenv("BURDENMLEDN_ANALYSIS_ROOT", unset = file.path(repo_dir, "analysis")), mustWork = FALSE)
 output_data_dir <- file.path(final_runs_dir, "outputs", "data")
 

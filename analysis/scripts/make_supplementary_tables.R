@@ -16,7 +16,7 @@ get_arg <- function(flag, default) {
 }
 
 script_file <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1])
-repo_dir <- dirname(dirname(normalizePath(script_file, mustWork = TRUE)))
+repo_dir <- dirname(dirname(dirname(normalizePath(script_file, mustWork = TRUE))))
 final_runs_dir <- normalizePath(Sys.getenv("BURDENMLEDN_ANALYSIS_ROOT", unset = file.path(repo_dir, "analysis")), mustWork = FALSE)
 derived_dir <- file.path(final_runs_dir, "outputs", "derived")
 output_dir <- get_arg(

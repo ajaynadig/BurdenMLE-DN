@@ -6,7 +6,7 @@ script_file <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = 
 script_file <- normalizePath(script_file, mustWork = TRUE)
 example_dir <- dirname(script_file)
 module_dir <- file.path(example_dir, "figure_modules")
-repo_dir <- dirname(example_dir)
+repo_dir <- dirname(dirname(example_dir))
 final_runs_dir <- normalizePath(Sys.getenv("BURDENMLEDN_ANALYSIS_ROOT", unset = file.path(repo_dir, "analysis")), mustWork = FALSE)
 
 modules <- c(

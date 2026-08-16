@@ -15,7 +15,7 @@ script_file <- if (length(script_arg)) {
   normalizePath(sys.frame(1)$ofile, mustWork = TRUE)
 }
 example_dir <- dirname(script_file)
-repo_dir <- dirname(example_dir)
+repo_dir <- dirname(dirname(example_dir))
 final_runs_dir <- normalizePath(Sys.getenv("BURDENMLEDN_ANALYSIS_ROOT", unset = file.path(repo_dir, "analysis")), mustWork = FALSE)
 
 parse_args <- function(x) {
