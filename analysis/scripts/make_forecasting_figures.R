@@ -143,7 +143,7 @@ p_effectsize_thresholds <- ggplot(
     width = 0.72, colour = "black"
   ) +
   geom_errorbar(
-    data = plot_df[!is.na(plot_df$lower), ],
+    data = plot_df,
     aes(ymin = lower, ymax = upper),
     position = position_dodge(width = dodge_width),
     width = 0.08, linewidth = 0.7
