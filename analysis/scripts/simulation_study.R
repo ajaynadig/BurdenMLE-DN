@@ -1,7 +1,11 @@
 library(ggplot2)
 library(data.table)
 library(patchwork)
-library(bayess)
+
+draw_dirichlet <- function(alpha) {
+  draws <- rgamma(length(alpha), shape = alpha, rate = 1)
+  draws / sum(draws)
+}
 
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -282,7 +286,7 @@ run_simulation_study <- function() {
     
     half_uniform = list(
       endpoints = seq(0, log(1/0.01), length.out = n_bins),
-      weights = function() bayess::rdirichlet(1, rep(1, n_bins))[1,]
+      weights = function() draw_dirichlet(rep(1, n_bins))
     ),
     
     half_infinitesimal = list(
