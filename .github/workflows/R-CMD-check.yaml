@@ -25,4 +25,6 @@ jobs:
           needs: check
       - name: Test analysis artifact contract
         run: Rscript tests/artifact_contracts.R
+      - name: Test reproduction entry points
+        run: Rscript tests/reproduction_entry_points.R
       - uses: r-lib/actions/check-r-package@v2

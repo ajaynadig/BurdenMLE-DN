@@ -14,7 +14,7 @@ get_arg <- function(flag, default) {
 script_file <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1])
 script_file <- normalizePath(script_file, mustWork = TRUE)
 example_dir <- dirname(script_file)
-repo_dir <- dirname(example_dir)
+repo_dir <- dirname(dirname(example_dir))
 final_runs_dir <- normalizePath(Sys.getenv("BURDENMLEDN_ANALYSIS_ROOT", unset = file.path(repo_dir, "analysis")), mustWork = FALSE)
 summary_file <- get_arg(
   "--cohort-summary-file",

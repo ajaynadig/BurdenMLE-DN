@@ -9,7 +9,7 @@ if (is.null(script_file)) {
   script_file <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1])
 }
 script_file <- normalizePath(script_file, mustWork = TRUE)
-repo_dir <- dirname(dirname(script_file))
+repo_dir <- dirname(dirname(dirname(script_file)))
 final_runs_dir <- normalizePath(Sys.getenv("BURDENMLEDN_ANALYSIS_ROOT", unset = file.path(repo_dir, "analysis")), mustWork = FALSE)
 
 for (source_file in c(
