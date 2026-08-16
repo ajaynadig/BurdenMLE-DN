@@ -26,6 +26,10 @@ forecast_file <- get_arg(
   "--forecast-file",
   file.path(final_runs_dir, "outputs", "derived", "forecasting", "forecast_summary.rds")
 )
+number_genes_file <- get_arg(
+  "--number-genes-file",
+  file.path(final_runs_dir, "outputs", "derived", "autism_dd", "number_genes.tsv")
+)
 reference_file <- get_arg(
   "--reference-file",
   file.path(final_runs_dir, "inputs", "reference", "full_results_ASD_all_NPDs_2026-03-04.txt")
@@ -43,11 +47,14 @@ dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(supp_figure_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
 
-for (file in c(main_summary_file, forecast_file, reference_file)) {
+for (file in c(main_summary_file, forecast_file, number_genes_file, reference_file)) {
   if (!file.exists(file)) stop("Required input does not exist: ", file)
 }
 main_summary <- readRDS(main_summary_file)
 forecast <- readRDS(forecast_file)
+number_genes <- read.table(
+  number_genes_file, sep = "\t", header = TRUE, stringsAsFactors = FALSE
+)
 significance <- read.table(reference_file, sep = "\t", header = TRUE,
                            stringsAsFactors = FALSE, check.names = FALSE)
 
@@ -77,6 +84,20 @@ prediction <- data.frame(
   RR_thresh = thresholds,
   num_genes = colSums(gene_probability[probability_columns])
 )
+prediction_intervals <- number_genes[
+  number_genes$diagnosis == "Autism" & number_genes$threshold %in% thresholds,
+  c("threshold", "estimate", "lower", "upper")
+]
+prediction_intervals <- prediction_intervals[
+  match(thresholds, prediction_intervals$threshold), , drop = FALSE
+]
+if (anyNA(prediction_intervals) ||
+    !isTRUE(all.equal(prediction$num_genes, prediction_intervals$estimate,
+                      tolerance = 1e-10))) {
+  stop("Figure 3A bootstrap intervals do not match its point estimates.")
+}
+prediction$lower <- prediction_intervals$lower
+prediction$upper <- prediction_intervals$upper
 significant_gene_counts <- function(fdr_threshold) {
   genes <- significance$Gene_ID[
     !significance$Flag & !is.na(significance$FDR) & significance$FDR < fdr_threshold
@@ -84,7 +105,9 @@ significant_gene_counts <- function(fdr_threshold) {
   matched <- gene_probability$gene_id %in% genes
   data.frame(
     RR_thresh = thresholds,
-    num_genes = colSums(gene_probability[matched, probability_columns, drop = FALSE])
+    num_genes = colSums(gene_probability[matched, probability_columns, drop = FALSE]),
+    lower = NA_real_,
+    upper = NA_real_
   )
 }
 asc_fdr_005 <- significant_gene_counts(0.05)
@@ -108,6 +131,7 @@ plot_df$study <- factor(
 plot_df$bar_label <- format(
   round(plot_df$num_genes), big.mark = ",", scientific = FALSE, trim = TRUE
 )
+plot_df$label_y <- ifelse(is.na(plot_df$upper), plot_df$num_genes, plot_df$upper)
 dodge_width <- 0.82
 
 p_effectsize_thresholds <- ggplot(
@@ -118,8 +142,14 @@ p_effectsize_thresholds <- ggplot(
     position = position_dodge(width = dodge_width),
     width = 0.72, colour = "black"
   ) +
+  geom_errorbar(
+    data = plot_df,
+    aes(ymin = lower, ymax = upper),
+    position = position_dodge(width = dodge_width),
+    width = 0.08, linewidth = 0.7
+  ) +
   geom_text(
-    aes(label = bar_label),
+    aes(y = label_y, label = bar_label),
     position = position_dodge(width = dodge_width),
     vjust = -0.45, size = 5, fontface = "bold"
   ) +
@@ -211,7 +241,9 @@ ggsave(file.path(figure_dir, "Figure3.pdf"),
 ggsave(file.path(supp_figure_dir, "SupplementaryFigure13_DDIDForecasting.pdf"),
        ForecastingPlot_DDID, device = cairo_pdf, width = 9, height = 4)
 
-write.table(plot_df, file.path(table_dir, "figure3_gene_count_bars.tsv"),
+write.table(
+  plot_df[, c("RR_thresh", "num_genes", "lower", "upper", "study", "bar_label")],
+  file.path(table_dir, "figure3_gene_count_bars.tsv"),
             sep = "\t", quote = TRUE, row.names = FALSE)
 write.table(forecast_df[forecast_df$threshold == 0, ],
             file.path(table_dir, "forecasting_gene_counts.tsv"),
