@@ -9,3 +9,4 @@ inputs/constraint	gnomAD constraint resources	Publicly available from gnomAD
 inputs/reference	Published gene-set and comparison resources	Obtain from the cited publications or supplements
 inputs/demographics	CDC paternal-age resources	Publicly available from CDC/NCHS
 inputs/age_phenotypes	Authorized age-at-diagnosis phenotype files	Restricted; obtain from the originating study
+inputs/gene_exclusions/updated_CES_genes_TableS36.tsv	Updated 69-gene clonal-expansion sensitivity set; first column contains gene symbols	Published supplementary Table S36 supplied with the manuscript analysis inputs

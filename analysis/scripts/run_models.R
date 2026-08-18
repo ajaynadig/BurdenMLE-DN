@@ -26,6 +26,7 @@ random_seed <- config$random_seed
 run_date <- config$run_date
 autism_max_effect_size <- config$autism_max_effect_size
 ddd_max_effect_size <- config$ddd_max_effect_size
+ces_gene_file <- config$ces_gene_file
 optimizer <- config$optimizer
 set.seed(random_seed)
 
@@ -236,19 +237,35 @@ if (analysis_mode == "no_ces") {
     "Combined Probands Syn", "Combined Siblings Syn"
   )
 
-  ces_gene_table <- read.csv(
-    file.path(input_dir, "gene_exclusions", "Sepliyarskiy_SuppTable6.csv")
-  )
   gnomad_v2 <- data.frame(fread(
     file.path(input_dir, "constraint", "gnomad.v2.1.1.lof_metrics.by_gene.txt")
   ))
-  ces_gene_symbols <- ces_gene_table$GeneID[
-    ces_gene_table$Category == "set 2"
-  ]
+  if (is.null(ces_gene_file)) {
+    ces_gene_file <- file.path(
+      input_dir, "gene_exclusions", "updated_CES_genes_TableS36.tsv"
+    )
+  }
+  ces_gene_file <- normalizePath(ces_gene_file, mustWork = TRUE)
+  ces_gene_table <- read.delim(
+    ces_gene_file, header = TRUE, stringsAsFactors = FALSE,
+    check.names = FALSE
+  )
+  if (ncol(ces_gene_table) < 1L) stop("CES gene table has no columns.")
+  ces_gene_symbols <- trimws(as.character(ces_gene_table[[1L]]))
+  if (anyNA(ces_gene_symbols) || any(!nzchar(ces_gene_symbols)) ||
+      anyDuplicated(ces_gene_symbols)) {
+    stop("The first CES gene-table column must contain unique, nonempty symbols.")
+  }
+  lookup_symbols <- ces_gene_symbols
+  lookup_symbols[lookup_symbols == "CERT1"] <- "COL4A3BP"
+  lookup_symbols[lookup_symbols == "NARS1"] <- "NARS"
   ces_gene_ids <- gnomad_v2$gene_id[
-    match(ces_gene_symbols, gnomad_v2$gene)
+    match(lookup_symbols, gnomad_v2$gene)
   ]
-  ces_gene_ids[ces_gene_symbols == "NARS1"] <- "ENSG00000134440"
+  if (anyNA(ces_gene_ids)) {
+    stop("CES symbols absent from the gene reference: ",
+         paste(ces_gene_symbols[is.na(ces_gene_ids)], collapse = ", "))
+  }
   genes_to_keep <- setdiff(rownames(autism_data$counts), ces_gene_ids)
   print(paste("Removing", sum(!rownames(autism_data$counts) %in% genes_to_keep),
               "CES genes"))
