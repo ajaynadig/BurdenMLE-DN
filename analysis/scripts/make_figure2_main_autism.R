@@ -148,7 +148,11 @@ Polygenicity_plot <- ggplot(
 
 # Figure 2D: retain the original bars, enrichment error bars, and fraction labels.
 enrichment_viz_df <- results$enrichment
-enrichment_viz_df$annot_reformat <- gsub("_", "\n", enrichment_viz_df$annotation)
+enrichment_viz_df$annot_reformat <- enrichment_viz_df$annotation
+enrichment_viz_df$annot_reformat[enrichment_viz_df$annotation == "LOEUF1_mu1"] <-
+  "LOEUF1\nhigh μ"
+enrichment_viz_df$annot_reformat[enrichment_viz_df$annotation == "LOEUF1_mu2"] <-
+  "LOEUF1\nlow μ"
 enrichment_viz_df$variant_class <- "PTV"
 EnrichmentPlot <- ggplot(
   enrichment_viz_df[enrichment_viz_df$annotation != "LOEUF5", ],
