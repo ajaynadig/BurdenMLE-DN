@@ -11,6 +11,7 @@ run_models_help <- function() {
     "  --run-date <label>                    Shared analysis-run label\n",
     "  --autism-max-effect-size <number>     Autism component upper bound\n",
     "  --ddd-max-effect-size <number>        DDD component upper bound\n",
+    "  --ces-gene-file <path>                Optional one-column CES gene table\n",
     "  --optimizer <EM|mixsqp>               Model optimizer (default: mixsqp)\n"
   )
 }
@@ -51,6 +52,8 @@ parse_run_models_args <- function(args, current_date = Sys.Date()) {
     get_arg("--autism-max-effect-size", "100")
   )
   ddd_max_effect_size <- as.numeric(get_arg("--ddd-max-effect-size", "250"))
+  ces_gene_file <- get_arg("--ces-gene-file", "")
+  if (!nzchar(ces_gene_file)) ces_gene_file <- NULL
   optimizer <- tolower(get_arg("--optimizer", "mixsqp"))
   optimizer <- if (optimizer == "mixsqp") {
     "mixsqp"
@@ -89,6 +92,7 @@ parse_run_models_args <- function(args, current_date = Sys.Date()) {
     run_date = run_date,
     autism_max_effect_size = autism_max_effect_size,
     ddd_max_effect_size = ddd_max_effect_size,
+    ces_gene_file = ces_gene_file,
     optimizer = optimizer
   )
 }
