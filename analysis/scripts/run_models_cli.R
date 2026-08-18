@@ -11,7 +11,7 @@ run_models_help <- function() {
     "  --run-date <label>                    Shared analysis-run label\n",
     "  --autism-max-effect-size <number>     Autism component upper bound\n",
     "  --ddd-max-effect-size <number>        DDD component upper bound\n",
-    "  --ces-gene-file <path>                Optional one-column CES gene table\n",
+    "  --ces-gene-file <path>                Override the default CES gene table\n",
     "  --optimizer <EM|mixsqp>               Model optimizer (default: mixsqp)\n"
   )
 }

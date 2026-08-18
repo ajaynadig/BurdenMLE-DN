@@ -241,24 +241,20 @@ if (analysis_mode == "no_ces") {
     file.path(input_dir, "constraint", "gnomad.v2.1.1.lof_metrics.by_gene.txt")
   ))
   if (is.null(ces_gene_file)) {
-    ces_gene_table <- read.csv(
-      file.path(input_dir, "gene_exclusions", "Sepliyarskiy_SuppTable6.csv")
+    ces_gene_file <- file.path(
+      input_dir, "gene_exclusions", "updated_CES_genes_TableS36.tsv"
     )
-    ces_gene_symbols <- ces_gene_table$GeneID[
-      ces_gene_table$Category == "set 2"
-    ]
-  } else {
-    ces_gene_file <- normalizePath(ces_gene_file, mustWork = TRUE)
-    ces_gene_table <- read.delim(
-      ces_gene_file, header = TRUE, stringsAsFactors = FALSE,
-      check.names = FALSE
-    )
-    if (ncol(ces_gene_table) < 1L) stop("CES gene table has no columns.")
-    ces_gene_symbols <- trimws(as.character(ces_gene_table[[1L]]))
-    if (anyNA(ces_gene_symbols) || any(!nzchar(ces_gene_symbols)) ||
-        anyDuplicated(ces_gene_symbols)) {
-      stop("The first CES gene-table column must contain unique, nonempty symbols.")
-    }
+  }
+  ces_gene_file <- normalizePath(ces_gene_file, mustWork = TRUE)
+  ces_gene_table <- read.delim(
+    ces_gene_file, header = TRUE, stringsAsFactors = FALSE,
+    check.names = FALSE
+  )
+  if (ncol(ces_gene_table) < 1L) stop("CES gene table has no columns.")
+  ces_gene_symbols <- trimws(as.character(ces_gene_table[[1L]]))
+  if (anyNA(ces_gene_symbols) || any(!nzchar(ces_gene_symbols)) ||
+      anyDuplicated(ces_gene_symbols)) {
+    stop("The first CES gene-table column must contain unique, nonempty symbols.")
   }
   lookup_symbols <- ces_gene_symbols
   lookup_symbols[lookup_symbols == "CERT1"] <- "COL4A3BP"
