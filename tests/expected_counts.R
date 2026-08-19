@@ -193,22 +193,18 @@ stopifnot(
   identical(n_fit$input_summary$case_rate_available, FALSE)
 )
 
-# Other expected-count-only paths remain available because they depend on the
-# likelihood exposure, not on per-haploid mutation rates.
+# Null simulation remains available for expected-count-only inputs because it
+# depends on the likelihood exposure, not on per-haploid mutation rates.
 capability_args <- base_args
 capability_args$input_data <- expected_data
 capability_args$optimizer <- "EM"
 capability_args$null_sim <- TRUE
 capability_args$n_null <- 2
-capability_args$estimate_effective_penetrance <- TRUE
 capability_args$max_iter <- 10000
 capability_args$tol <- 1e-10
 set.seed(7)
 capability_fit <- quiet_fit(capability_args)
-stopifnot(
-  length(capability_fit$null_delta) == 2,
-  is.finite(capability_fit$penetrance$effective_penetrance)
-)
+stopifnot(length(capability_fit$null_delta) == 2)
 
 # A governed-data-free gnomAD-shaped calibration fixture uses gene_id as the
 # explicit package identity and preserves its supplied synonymous expectations.
@@ -257,7 +253,7 @@ expect_error_matching(
 )
 
 penetrance_prevalence_args <- calibration_args
-penetrance_prevalence_args$input_data <- expected_data
+penetrance_prevalence_args$input_data <- expected_with_rate
 penetrance_prevalence_args$features <- features
 penetrance_prevalence_args$component_endpoints <- endpoints
 penetrance_prevalence_args$estimate_effective_penetrance <- TRUE

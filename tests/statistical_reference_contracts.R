@@ -98,48 +98,52 @@ gene_average <- 0.02 * mean(numerator) / mean(denominator)
 mutation_weighted <- 0.02 *
   sum(heterogeneous$input$case_rate * numerator) /
   sum(heterogeneous$input$case_rate * denominator)
-internal_gene_average <- BurdenMLEDN:::effective_penetrance_func(
+internal_weighted <- BurdenMLEDN:::effective_penetrance_func(
   heterogeneous$fit, heterogeneous$genetic_data, 0.02
 )
-observed_weighted <- mutation_weighted_effective_penetrance(
-  heterogeneous$fit, heterogeneous$input
-)
 stopifnot(
-  isTRUE(all.equal(internal_gene_average, gene_average, tolerance = 1e-14)),
-  isTRUE(all.equal(observed_weighted, mutation_weighted, tolerance = 1e-14)),
-  observed_weighted > gene_average
+  isTRUE(all.equal(internal_weighted, mutation_weighted, tolerance = 1e-14)),
+  internal_weighted > gene_average
 )
 
 symmetric <- make_penetrance_fixture(c(0.002, 0.002))
 stopifnot(isTRUE(all.equal(
-  mutation_weighted_effective_penetrance(symmetric$fit, symmetric$input),
   BurdenMLEDN:::effective_penetrance_func(
     symmetric$fit, symmetric$genetic_data, 0.02
   ),
+  gene_average,
   tolerance = 1e-14
 )))
 
 expected_only <- heterogeneous$input[c("case_count")]
 expected_only$expected_count <- heterogeneous$genetic_data$expected_count
-expect_error(mutation_weighted_effective_penetrance(
-  heterogeneous$fit, expected_only
-))
-reordered <- heterogeneous$input[2:1, , drop = FALSE]
-expect_error(mutation_weighted_effective_penetrance(
-  heterogeneous$fit, reordered
-))
-bad_prevalence <- heterogeneous$fit
-bad_prevalence$prevalence <- NULL
-expect_error(mutation_weighted_effective_penetrance(
-  bad_prevalence, heterogeneous$input
+expect_error(BurdenMLEDN:::effective_penetrance_func(
+  heterogeneous$fit, expected_only, 0.02
 ))
 
-# The default fit continues to expose only the established gene-average fields.
+# The default fit exposes the mutation-weighted estimand and therefore requires
+# explicit mutation rates.
 default_penetrance_data <- data.frame(
   case_count = c(0, 1, 0, 2),
-  expected_count = c(0.2, 0.4, 0.3, 0.5),
+  case_rate = c(0.001, 0.002, 0.0015, 0.0025),
+  N = rep(100, 4),
   row.names = paste0("d", 1:4)
 )
+expected_count_only <- data.frame(
+  case_count = default_penetrance_data$case_count,
+  expected_count = 2 * default_penetrance_data$N *
+    default_penetrance_data$case_rate,
+  row.names = rownames(default_penetrance_data)
+)
+expect_error(quiet_fit(list(
+  input_data = expected_count_only,
+  component_endpoints = c(0, log(2), log(5)),
+  prevalence = 0.02,
+  bootstrap = FALSE,
+  null_sim = FALSE,
+  mutvar_est = FALSE,
+  estimate_effective_penetrance = TRUE
+)))
 default_penetrance_fit <- quiet_fit(list(
   input_data = default_penetrance_data,
   component_endpoints = c(0, log(2), log(5)),
@@ -153,9 +157,56 @@ stopifnot(identical(
   names(default_penetrance_fit$penetrance),
   c("effective_penetrance", "effective_penetrance_CI")
 ))
+default_genetic_data <- BurdenMLEDN:::process_data_trio(default_penetrance_data)
 stopifnot(isTRUE(all.equal(
   default_penetrance_fit$penetrance$effective_penetrance,
-  0.0595332987534143,
+  BurdenMLEDN:::effective_penetrance_func(
+    default_penetrance_fit, default_genetic_data, 0.02
+  ),
+  tolerance = 1e-14
+)))
+
+# The stored bootstrap interval uses the resampled genes' corresponding
+# mutation weights in every replicate.
+penetrance_bootstrap_samples <- matrix(
+  c(
+    "d1", "d2", "d3", "d4",
+    "d1", "d1", "d2", "d4",
+    "d2", "d3", "d3", "d4",
+    "d1", "d2", "d4", "d4"
+  ),
+  nrow = 4,
+  dimnames = list(NULL, paste0("bootstrap_", 1:4))
+)
+bootstrap_penetrance_fit <- quiet_fit(list(
+  input_data = default_penetrance_data,
+  component_endpoints = c(0, log(2), log(5)),
+  prevalence = 0.02,
+  bootstrap = TRUE,
+  bootstrap_samples = penetrance_bootstrap_samples,
+  n_boot = 4,
+  null_sim = FALSE,
+  mutvar_est = FALSE,
+  estimate_effective_penetrance = TRUE
+))
+bootstrap_genetic_data <- BurdenMLEDN:::process_data_trio(
+  default_penetrance_data
+)
+bootstrap_penetrance_estimates <- vapply(seq_len(4), function(iteration) {
+  replicate <- BurdenMLEDN:::reconstruct_bootstrap_replicate(
+    bootstrap_penetrance_fit,
+    bootstrap_genetic_data,
+    iteration
+  )
+  BurdenMLEDN:::effective_penetrance_func(
+    replicate$model,
+    replicate$genetic_data,
+    prevalence = 0.02
+  )
+}, numeric(1))
+stopifnot(isTRUE(all.equal(
+  unname(bootstrap_penetrance_fit$penetrance$effective_penetrance_CI),
+  unname(quantile(bootstrap_penetrance_estimates, c(0.025, 0.975))),
   tolerance = 1e-14
 )))
 

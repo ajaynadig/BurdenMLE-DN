@@ -154,15 +154,16 @@ calculate_true_frac_cases <- function(effect_sizes, sim_data, threshold) {
 
 # Calculate true effective penetrance based on true effect sizes
 calculate_true_effective_penetrance <- function(true_effects, sim_data, prevalence) {
-  # Calculate numerator: mean((exp(x)-1)*exp(x))
-  peneff_numerator <- mean((exp(true_effects) - 1) * exp(true_effects))
-  
-  # Calculate denominator: mean(exp(x)-1)
-  peneff_denominator <- mean(exp(true_effects) - 1)
-  
-  # Calculate effective penetrance
-  peneff <- prevalence * (peneff_numerator/peneff_denominator)
-  return(peneff)
+  rate_ratio <- exp(true_effects)
+  mutation_weights <- sim_data$case_rate
+  peneff_numerator <- sum(
+    mutation_weights * (rate_ratio - 1) * rate_ratio
+  )
+  peneff_denominator <- sum(mutation_weights * (rate_ratio - 1))
+  if (!is.finite(peneff_denominator) || peneff_denominator == 0) {
+    return(NA_real_)
+  }
+  prevalence * peneff_numerator / peneff_denominator
 }
 
 get_fraccase<- function(model,genetic_data,threshold) {

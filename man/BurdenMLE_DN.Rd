@@ -89,9 +89,10 @@ RNG state is restored.}
 
 \item{estimate_posteriors}{Compute gene-level posterior summaries.}
 
-\item{estimate_effective_penetrance}{Compute gene-average effective
-penetrance. The distinct mutation-weighted estimand is available through
-\code{\link[=mutation_weighted_effective_penetrance]{mutation_weighted_effective_penetrance()}}.}
+\item{estimate_effective_penetrance}{Compute mutation-weighted effective
+penetrance: the average penetrance of an excess case-associated de novo
+variant. This requires \code{case_rate}; expected counts alone do not uniquely
+determine mutation-rate weights.}
 
 \item{optimizer}{Optimization routine. MixSQP is the supported default.}
 
@@ -106,9 +107,10 @@ An object of class \code{BurdenMLEDN_fit}. Important fields include
 \code{bootstrap_output}, \code{null_output}, \code{input_summary}, and
 \code{optimizer_elapsed}.
 \code{input_summary$sample_size} is \code{NA} when \code{N} was not supplied, and
-\code{input_summary$case_rate_available} reports whether mutation-rate-dependent
-estimands are supported. Stratum-indexed weights, mutational-variance
-summaries, and confidence intervals retain the feature-column names.
+\code{input_summary$case_rate_available} reports whether explicit mutation rates
+were supplied and mutation-rate-dependent estimands are supported.
+Stratum-indexed weights, mutational-variance summaries, and confidence
+intervals retain the feature-column names.
 }
 \description{
 Fits a discrete-mixture model to gene-level de novo variant counts using

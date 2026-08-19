@@ -21,8 +21,8 @@ retain the feature-column names and order. The most useful fields are:
 | `mutvar_output$frac_expected` | When `mutvar_est = TRUE` | Fraction of the total reference mutation rate contributed by each annotation stratum. |
 | `mutvar_output$enrichment` | When total mutational variance is positive | `frac_mutvar / frac_expected`; values above one indicate more mutational variance than expected from mutation rate alone. |
 | `mutvar_output$enrich_CI` | With a defined bootstrap enrichment | Percentile-bootstrap 95% intervals for enrichment. |
-| `penetrance$effective_penetrance` | When `estimate_effective_penetrance = TRUE` | Gene-average penetrance among the excess risk attributable to the modeled variant class. This remains the package's default effective-penetrance estimand. |
-| `penetrance$effective_penetrance_CI` | With bootstrap and penetrance | Percentile-bootstrap 95% interval for gene-average effective penetrance. |
+| `penetrance$effective_penetrance` | When `estimate_effective_penetrance = TRUE` | Mutation-rate-weighted average penetrance of an excess case-associated de novo variant. This estimand requires `case_rate`. |
+| `penetrance$effective_penetrance_CI` | With bootstrap and penetrance | Gene-bootstrap percentile 95% interval for mutation-weighted effective penetrance. |
 | `posterior_gene_estimates` | When `estimate_posteriors = TRUE` | Observed/expected rate ratios, inclusive one-sided Poisson probabilities `P(X >= observed)`, and posterior-mean gene rate ratios. |
 | `bootstrap_output` | When `bootstrap = TRUE` | Named replicate fit records and compatibility weight matrices, canonical sampled gene IDs, resolved local indices, and replay seeds. |
 | `null_output` | Only when `null_sim = TRUE` | Named null-replicate fit records, compatibility weight matrices, and replay seeds. |
@@ -33,10 +33,6 @@ fitted weights alone. Full-data nonconvergence is an error. A finite,
 simplex-valid nonconverged uncertainty replicate remains in the interval and
 sets `uncertainty_reliable = FALSE`; a nonfinite or invalid replicate stops the
 uncertainty stage.
-
-Call `mutation_weighted_effective_penetrance(fit, input_data)` explicitly to
-calculate the distinct mutation-weighted estimand. It is not computed or used
-by default.
 
 When null simulation is requested, `mutvar_output$mutvar_p` includes null
 values tied with or above the observed mutational variance and uses the
