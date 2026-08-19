@@ -2,8 +2,9 @@
 
 - Corrected public one-sided p-values to include ties and added a finite-null
   plus-one correction.
-- Clarified that the default effective-penetrance output is gene averaged and
-  added an explicit opt-in mutation-weighted estimator.
+- Effective penetrance is now mutation-rate weighted, representing the average
+  penetrance of an excess case-associated de novo variant; `case_rate` is
+  required when this estimand is requested.
 - Added invariant validation for the bundled public gene reference and aligned
   the manual model-fitting optimizer default with MixSQP.
 - Added a prepared gene posterior sampler that draws continuous effects from

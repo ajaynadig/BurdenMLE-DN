@@ -23,14 +23,15 @@ exposure columns are present, supplied expected counts must agree with
 tolerance of `1e-8`. Rows with missing, non-finite, or negative exposure values
 are rejected.
 
-Expected-count-only inputs support fitting, null simulation, posterior
-summaries, and effective penetrance. Mutational variance requires `case_rate`;
-set `mutvar_est = FALSE` when it is unavailable. If `N` is known, callers may
-derive `case_rate = expected_count / (2 * N)` and rerun under their own
-responsibility; the package does not infer mutation rates or sample sizes.
+Expected-count-only inputs support fitting, null simulation, and posterior
+summaries. Mutational variance and mutation-weighted effective penetrance
+require `case_rate`; set `mutvar_est = FALSE` and
+`estimate_effective_penetrance = FALSE` when it is unavailable. If `N` is
+known, callers may derive `case_rate = expected_count / (2 * N)` and rerun under
+their own responsibility; the package does not infer mutation rates or sample sizes.
 `input_summary$sample_size` is `NA` when `N` is absent, and
-`input_summary$case_rate_available` states whether mutation-rate-dependent
-estimands are supported.
+`input_summary$case_rate_available` states whether explicit mutation rates were
+supplied and mutation-rate-dependent estimands are supported.
 
 `prevalence` is required when the package generates component endpoints or
 when mutational variance or effective penetrance is requested. It may be

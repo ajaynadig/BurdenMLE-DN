@@ -399,10 +399,37 @@ precompute_effective_penetrance_moments <- function(
   list(numerator = numerator, denominator = denominator)
 }
 
-effective_penetrance_from_moments <- function(model, moments, prevalence) {
+effective_penetrance_weights <- function(genetic_data) {
+  if (!"case_rate" %in% names(genetic_data)) {
+    stop(
+      "Mutation-weighted effective penetrance requires case_rate. ",
+      "Expected counts alone do not uniquely determine mutation-rate weights."
+    )
+  }
+  weights <- genetic_data$case_rate
+  if (length(weights) != nrow(genetic_data) || anyNA(weights) ||
+      any(!is.finite(weights)) || any(weights < 0)) {
+    stop("Effective-penetrance mutation weights must be finite and nonnegative.")
+  }
+  weights
+}
+
+effective_penetrance_from_moments <- function(model,
+                                               moments,
+                                               prevalence,
+                                               mutation_weights) {
   posteriors <- component_posterior_probabilities(model)
-  numerator <- mean(rowSums(posteriors * moments$numerator))
-  denominator <- mean(rowSums(posteriors * moments$denominator))
+  no_genes <- nrow(posteriors)
+  if (length(mutation_weights) != no_genes || anyNA(mutation_weights) ||
+      any(!is.finite(mutation_weights)) || any(mutation_weights < 0)) {
+    stop("Effective-penetrance mutation weights must match the fitted genes.")
+  }
+  numerator <- sum(
+    mutation_weights * rowSums(posteriors * moments$numerator)
+  )
+  denominator <- sum(
+    mutation_weights * rowSums(posteriors * moments$denominator)
+  )
   if (!is.finite(denominator) || denominator == 0) return(NA_real_)
   prevalence * numerator / denominator
 }
@@ -417,7 +444,12 @@ effective_penetrance_func <- function(model,
       model, genetic_data, gamma_scaling_factor
     )
   }
-  effective_penetrance_from_moments(model, moments, prevalence)
+  effective_penetrance_from_moments(
+    model,
+    moments,
+    prevalence,
+    effective_penetrance_weights(genetic_data)
+  )
 }
 
 validate_fit_input_data <- function(fit, input_data) {
@@ -467,47 +499,6 @@ validate_fit_input_data <- function(fit, input_data) {
   }
 
   list(genetic_data = genetic_data, gene_ids = fit_gene_ids)
-}
-
-#' Calculate mutation-weighted effective penetrance
-#'
-#' Calculates average penetrance among the excess risk attributable to the
-#' modeled variant class, weighting genes by their per-haploid mutation rates.
-#' This is distinct from the gene-average `penetrance$effective_penetrance`
-#' stored by [BurdenMLE_DN()]. It is computed only when this function is called.
-#'
-#' @param fit A fitted `BurdenMLEDN_fit` object with a valid stored prevalence.
-#' @param input_data The same gene-level data used to fit `fit`, in the same
-#'   gene order, including `case_rate`.
-#'
-#' @return One mutation-weighted effective-penetrance estimate.
-#' @export
-mutation_weighted_effective_penetrance <- function(fit, input_data) {
-  if (!inherits(fit, "BurdenMLEDN_fit")) {
-    stop("fit must be a BurdenMLEDN_fit.")
-  }
-  validated <- validate_fit_input_data(fit, input_data)
-  genetic_data <- validated$genetic_data
-  if (!"case_rate" %in% names(genetic_data)) {
-    stop("mutation-weighted effective penetrance requires input_data$case_rate.")
-  }
-  prevalence <- fit$prevalence
-  if (length(prevalence) != 1L || !is.numeric(prevalence) ||
-      is.na(prevalence) || !is.finite(prevalence) ||
-      prevalence <= 0 || prevalence >= 1) {
-    stop("fit must contain one finite prevalence strictly between 0 and 1.")
-  }
-
-  moments <- precompute_effective_penetrance_moments(fit, genetic_data)
-  posteriors <- component_posterior_probabilities(fit)
-  numerator <- sum(
-    genetic_data$case_rate * rowSums(posteriors * moments$numerator)
-  )
-  denominator <- sum(
-    genetic_data$case_rate * rowSums(posteriors * moments$denominator)
-  )
-  if (!is.finite(denominator) || denominator == 0) return(NA_real_)
-  prevalence * numerator / denominator
 }
 
 #' Prepare a likelihood-conditioned gene posterior sampler

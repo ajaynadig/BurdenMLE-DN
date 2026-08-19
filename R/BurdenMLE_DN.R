@@ -50,9 +50,10 @@ inclusive_finite_null_pvalue <- function(null_values, observed_value) {
 #'   RNG state is restored.
 #' @param return_likelihood Store the maximized log likelihood.
 #' @param estimate_posteriors Compute gene-level posterior summaries.
-#' @param estimate_effective_penetrance Compute gene-average effective
-#'   penetrance. The distinct mutation-weighted estimand is available through
-#'   [mutation_weighted_effective_penetrance()].
+#' @param estimate_effective_penetrance Compute mutation-weighted effective
+#'   penetrance: the average penetrance of an excess case-associated de novo
+#'   variant. This requires `case_rate`; expected counts alone do not uniquely
+#'   determine mutation-rate weights.
 #' @param optimizer Optimization routine. MixSQP is the supported default.
 #' @param mixsqp_control Named list passed to `mixsqp::mixsqp()`. Package
 #'   defaults preserve small components and scale the active-set allowance to
@@ -69,9 +70,10 @@ inclusive_finite_null_pvalue <- function(null_values, observed_value) {
 #'   `bootstrap_output`, `null_output`, `input_summary`, and
 #'   `optimizer_elapsed`.
 #'   `input_summary$sample_size` is `NA` when `N` was not supplied, and
-#'   `input_summary$case_rate_available` reports whether mutation-rate-dependent
-#'   estimands are supported. Stratum-indexed weights, mutational-variance
-#'   summaries, and confidence intervals retain the feature-column names.
+#'   `input_summary$case_rate_available` reports whether explicit mutation rates
+#'   were supplied and mutation-rate-dependent estimands are supported.
+#'   Stratum-indexed weights, mutational-variance summaries, and confidence
+#'   intervals retain the feature-column names.
 #' @export
 #'
 #' @examples
@@ -126,6 +128,9 @@ BurdenMLE_DN <- function(input_data,
   genetic_data = process_data_trio(input_data)
   if (mutvar_est) {
     require_case_rate_for_mutvar(genetic_data)
+  }
+  if (estimate_effective_penetrance) {
+    effective_penetrance_weights(genetic_data)
   }
 
   prevalence_required <- is.null(component_endpoints) || mutvar_est ||
