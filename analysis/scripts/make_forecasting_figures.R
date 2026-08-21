@@ -226,8 +226,14 @@ ForecastingPlot_DDID <- ggplot(
   geom_line() +
   geom_line(mapping = aes(y = count_bonferroni_mean - count_bonferroni_sd), alpha = 0.3) +
   geom_line(mapping = aes(y = count_bonferroni_mean + count_bonferroni_sd), alpha = 0.3) +
-  scale_color_manual(values = palette_DDID) +
-  scale_fill_manual(values = palette_DDID) +
+  scale_color_manual(
+    values = palette_DDID,
+    labels = c("DDID" = "DD/ID", "Non-DDID" = "Non-DD/ID")
+  ) +
+  scale_fill_manual(
+    values = palette_DDID,
+    labels = c("DDID" = "DD/ID", "Non-DDID" = "Non-DD/ID")
+  ) +
   theme_bhr_legend_gridlines() +
   labs(
     x = "Sample Size", y = "Number of Significant Genes\n(PTV)",

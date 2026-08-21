@@ -43,6 +43,7 @@ theme_bhr_legend_gridlines <- function() {
 }
 
 combined <- DDID_compare_df[DDID_compare_df$Dataset == "Combined", ]
+ddid_axis_labels <- c("DDID" = "DD/ID", "Non-DDID" = "Non-DD/ID")
 DDID_mutvar_plot <- ggplot(
   data = combined,
   mapping = aes(x = DDID, y = mutvar_combined,
@@ -50,6 +51,7 @@ DDID_mutvar_plot <- ggplot(
 ) +
   geom_hline(mapping = aes(yintercept = 0)) + geom_pointrange() +
   theme_bhr_legend_gridlines() + ylim(0, 0.045) +
+  scale_x_discrete(labels = ddid_axis_labels) +
   labs(x = "", y = "Mutational Variance\nPTV + Mis2")
 
 DDID_fraccase_plot <- ggplot(
@@ -59,6 +61,7 @@ DDID_fraccase_plot <- ggplot(
 ) +
   geom_hline(mapping = aes(yintercept = 0)) + geom_pointrange() +
   theme_bhr_legend_gridlines() +
+  scale_x_discrete(labels = ddid_axis_labels) +
   labs(x = "", y = "Fraction of Cases\nRR>5, PTV + Mis2")
 
 DDID_effRR_plot <- ggplot(
@@ -68,6 +71,7 @@ DDID_effRR_plot <- ggplot(
 ) +
   geom_hline(mapping = aes(yintercept = 0)) + geom_pointrange() +
   theme_bhr_legend_gridlines() +
+  scale_x_discrete(labels = ddid_axis_labels) +
   labs(x = "", y = "Effective Rate Ratio\nPTV")
 
 DDID_fig <- DDID_mutvar_plot + DDID_fraccase_plot + DDID_effRR_plot +
@@ -75,13 +79,40 @@ DDID_fig <- DDID_mutvar_plot + DDID_fraccase_plot + DDID_effRR_plot +
   theme(plot.tag = element_text(size = 25))
 
 maxstrat_table <- DDID_compare_df[DDID_compare_df$Dataset != "Combined", ]
+maxstrat_n <- do.call(rbind, lapply(
+  split(maxstrat_table, list(maxstrat_table$Sex, maxstrat_table$Dataset)),
+  function(x) {
+    ddid_n <- x$N[x$DDID == "DDID"]
+    non_ddid_n <- x$N[x$DDID == "Non-DDID"]
+    data.frame(
+      Sex = x$Sex[1],
+      Dataset = x$Dataset[1],
+      label = sprintf(
+        "N DD/ID = %s\nN Non-DD/ID = %s",
+        format(ddid_n, big.mark = ",", scientific = FALSE),
+        format(non_ddid_n, big.mark = ",", scientific = FALSE)
+      )
+    )
+  }
+))
+maxstrat_n_layer <- geom_text(
+  data = maxstrat_n,
+  mapping = aes(x = Inf, y = Inf, label = label),
+  inherit.aes = FALSE,
+  hjust = 1.08,
+  vjust = 1.15,
+  size = 3.5,
+  lineheight = 0.95
+)
 DDID_mutvar_plot_maxstrat <- ggplot(
   data = maxstrat_table,
   mapping = aes(x = DDID, y = mutvar_combined,
                 ymin = mutvar_combined_lower, ymax = mutvar_combined_upper)
 ) +
   geom_hline(mapping = aes(yintercept = 0)) + geom_pointrange() +
+  maxstrat_n_layer +
   theme_bhr_legend_gridlines() +
+  scale_x_discrete(labels = ddid_axis_labels) +
   labs(x = "", y = "Mutational Variance\nPTV + Mis2") +
   facet_grid(rows = vars(Sex), cols = vars(Dataset))
 
@@ -91,7 +122,9 @@ DDID_fraccase_plot_maxstrat <- ggplot(
                 ymin = fraccase_RR5_lower, ymax = fraccase_RR5_upper)
 ) +
   geom_hline(mapping = aes(yintercept = 0)) + geom_pointrange() +
+  maxstrat_n_layer +
   theme_bhr_legend_gridlines() +
+  scale_x_discrete(labels = ddid_axis_labels) +
   labs(x = "", y = "Fraction of Cases\nRR>5, PTV + Mis2") +
   facet_grid(rows = vars(Sex), cols = vars(Dataset))
 
@@ -101,7 +134,9 @@ DDID_effRR_plot_maxstrat <- ggplot(
                 ymin = PTV_effRR_lower, ymax = PTV_effRR_upper)
 ) +
   geom_hline(mapping = aes(yintercept = 0)) + geom_pointrange() +
+  maxstrat_n_layer +
   theme_bhr_legend_gridlines() +
+  scale_x_discrete(labels = ddid_axis_labels) +
   labs(x = "", y = "Effective Rate Ratio\nPTV") +
   facet_grid(rows = vars(Sex), cols = vars(Dataset))
 
