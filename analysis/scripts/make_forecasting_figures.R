@@ -168,7 +168,7 @@ p_effectsize_thresholds <- ggplot(
     labels = function(x) format(x, big.mark = ",", scientific = FALSE, trim = TRUE),
     expand = expansion(mult = c(0, 0.11))
   ) +
-  labs(x = "Risk-ratio threshold", y = "Number of significant genes") +
+  labs(x = "Rate-ratio threshold", y = "Number of significant genes") +
   theme_bhr_gridlines() +
   theme(
     legend.position = "right", legend.direction = "vertical",
