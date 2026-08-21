@@ -103,7 +103,7 @@ summarize_stratum <- function(stratum) {
       autism_data$ptv_scale_factor + fraction_cases(mis2_boot$model, mis2_boot$data)
   }
   data.frame(
-    stratum = stratum, prevalence = prevalence,
+    stratum = stratum, N = unique(ptv_data$N), prevalence = prevalence,
     mutvar_combined = mutvar,
     mutvar_combined_lower = unname(quantile(mutvar_boot, 0.025)),
     mutvar_combined_upper = unname(quantile(mutvar_boot, 0.975)),
