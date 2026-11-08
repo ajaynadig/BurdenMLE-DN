@@ -63,7 +63,7 @@ inclusive_finite_null_pvalue <- function(null_values, observed_value) {
 #'   `P(X >= observed)`. When null simulation and mutational variance are both
 #'   requested, the finite-null p-value includes ties and uses a plus-one
 #'   correction, so its minimum is `1 / (n_null + 1)`.
-#'   Effective penetrance outside [0,1] or non-finite produces a warning,
+#'   Effective penetrance outside `[0,1]` or non-finite produces a warning,
 #'   without clipping the estimate. This excess-weighted ratio can be unstable
 #'   near the null. Finite out-of-range bootstrap estimates are retained;
 #'   any non-finite replicate leaves both interval endpoints `NA`.

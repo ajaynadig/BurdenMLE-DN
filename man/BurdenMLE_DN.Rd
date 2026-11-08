@@ -122,7 +122,7 @@ Gene-level Poisson p-values are inclusive one-sided probabilities,
 \code{P(X >= observed)}. When null simulation and mutational variance are both
 requested, the finite-null p-value includes ties and uses a plus-one
 correction, so its minimum is \code{1 / (n_null + 1)}.
-Effective penetrance outside \link{0,1} or non-finite produces a warning,
+Effective penetrance outside \code{[0,1]} or non-finite produces a warning,
 without clipping the estimate. This excess-weighted ratio can be unstable
 near the null. Finite out-of-range bootstrap estimates are retained;
 any non-finite replicate leaves both interval endpoints \code{NA}.
