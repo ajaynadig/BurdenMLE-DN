@@ -27,4 +27,6 @@ jobs:
         run: Rscript tests/artifact_contracts.R
       - name: Test reproduction entry points
         run: Rscript tests/reproduction_entry_points.R
+      - name: Test shared workflow dependency and restart contracts
+        run: python3 tests/workflow.py
       - uses: r-lib/actions/check-r-package@v2

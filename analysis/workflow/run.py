@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """One analysis graph, executed locally or through native sbatch. Plans by default."""
 import argparse
+import csv
 import contextlib
 import hashlib
 import json
@@ -230,6 +231,21 @@ def initialize(c):
     atomic_json(root / "workflow/config.json", c)
 
 
+def verify_inputs(c):
+    """Before an explicit restart, reject changed raw inputs or saved draws."""
+    root = Path(c["root"])
+    for filename in ("input_manifest.tsv", "bootstrap_inputs.tsv"):
+        path = root / "provenance" / filename
+        if not path.exists():
+            continue  # Imported reporting roots record imports instead of raw preparation.
+        with path.open() as stream:
+            for row in csv.DictReader(stream, delimiter="\t"):
+                source = Path(row["path"])
+                if not source.is_absolute(): source = root / source
+                if sha(source) != row["sha256"]:
+                    raise RuntimeError("Changed input: " + str(source))
+
+
 def execute(c, stage, task=None):
     root = Path(c["root"])
     initialize(c)
@@ -341,6 +357,7 @@ def main():
             print(stage, ",".join(PARENTS[stage]) or "-", ARRAYS.get(stage, 1), "reuse" if stage in reuse else "run", sep="\t")
         return
     initialize(c)
+    if reuse: verify_inputs(c)
     (Path(c["root"]) / "logs").mkdir(exist_ok=True)
     if args.backend == "slurm": submit(c, stages, reuse); return
     for stage in stages:
