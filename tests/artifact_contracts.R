@@ -84,6 +84,33 @@ invisible(write_model_manifest(
   artifacts = c(test = artifact_path)
 ))
 
+# Source archives have explicit unknown Git metadata, including when nested
+# beneath an unrelated checkout. The .git entry must belong to repo_dir itself.
+archive_dir <- file.path(fixture_dir, "unpacked source")
+dir.create(archive_dir)
+archive_state <- repository_state(archive_dir)
+stopifnot(
+  identical(archive_state$commit, NA_character_),
+  identical(archive_state$tracked_dirty, NA),
+  identical(archive_state$git_available, FALSE)
+)
+archive_manifest <- readRDS(manifest_path)
+archive_manifest$repository <- archive_state
+archive_manifest_path <- file.path(fixture_dir, "archive_manifest.rds")
+saveRDS(archive_manifest, archive_manifest_path)
+stopifnot(identical(read_model_manifest(archive_manifest_path), archive_manifest))
+if (nzchar(Sys.which("git"))) {
+  invisible(system2("git", c("init", "--quiet", shQuote(fixture_dir))))
+  stopifnot(identical(repository_state(archive_dir), archive_state))
+}
+
+# Existing manifests without the new availability flag remain valid.
+legacy_manifest <- readRDS(manifest_path)
+legacy_manifest$repository <- list(commit = "legacy-commit", tracked_dirty = FALSE)
+legacy_manifest_path <- file.path(fixture_dir, "legacy_manifest.rds")
+saveRDS(legacy_manifest, legacy_manifest_path)
+stopifnot(identical(read_model_manifest(legacy_manifest_path), legacy_manifest))
+
 # A newer-looking file has no effect: the manifest-selected path is exact.
 decoy_path <- file.path(fixture_dir, "models_autism_test_zzzz.Rdata")
 decoy <- "not a model"
@@ -351,7 +378,7 @@ consumer_files <- c(
   "summarize_secondary_autism.R", "summarize_posterior_diagnostics.R",
   "summarize_autism_dd.R", "summarize_autism_dd_prevalence.R",
   "summarize_no_overlap.R", "forecasting_script_revision.R",
-  "describe_us_father_age.R", "make_supplementary_tables.R",
+  "make_supplementary_tables.R",
   "make_manuscript_estimate_table.R", "figure_modules/make_sensitivity_figures.R"
 )
 for (consumer_file in file.path("analysis", "scripts", consumer_files)) {
@@ -363,6 +390,19 @@ for (consumer_file in file.path("analysis", "scripts", consumer_files)) {
   )
   parse(consumer_file)
 }
+
+# Paternal-age sensitivity uses the corrected SPARK cohort summary rather
+# than recomputing an unscaled baseline from the pooled model artifact.
+age_text <- paste(readLines("analysis/scripts/describe_us_father_age.R"),
+                  collapse = "\n")
+stopifnot(
+  grepl("--cohort-summary-file", age_text, fixed = TRUE),
+  grepl("readRDS(cohort_summary_file)", age_text, fixed = TRUE),
+  grepl("cohort_summary$study == \"SPARK\"", age_text, fixed = TRUE),
+  grepl("cohort_summary$sex == \"Both\"", age_text, fixed = TRUE),
+  !grepl("list\\.files\\(", age_text),
+  !grepl("models_.*\\\\.Rdata", age_text)
+)
 
 producer_text <- paste(
   readLines("analysis/scripts/run_models.R", warn = FALSE), collapse = "\n"
@@ -388,7 +428,7 @@ main_consumers <- c(
   "forecasting_script_revision.R", "summarize_autism_dd.R",
   "summarize_autism_dd_prevalence.R", "summarize_secondary_autism.R",
   "summarize_posterior_diagnostics.R", "summarize_ddid.R",
-  "describe_us_father_age.R", "make_supplementary_tables.R",
+  "make_supplementary_tables.R",
   "make_manuscript_estimate_table.R"
 )
 for (script in main_consumers) {
@@ -396,5 +436,52 @@ for (script in main_consumers) {
 }
 assert_manifest_route("summarize_no_overlap.R", "NO_OVERLAP_MODEL_MANIFEST")
 assert_manifest_route("make_supplementary_figures.R", "NO_CES_MODEL_MANIFEST")
+assert_manifest_route("describe_us_father_age.R", "--cohort-summary-file")
+stopifnot(
+  grep("/summarize_cohort_sex.R", runner_lines)[1] <
+    grep("/describe_us_father_age.R", runner_lines)[1]
+)
+
+# The manuscript scaling helper shares diagnostics but keeps its old numerical
+# calculation and quantile behavior. Test it against the explicit old formula.
+source("analysis/scripts/secondary_analysis_functions.R")
+scaled_input <- raw_input
+scaled_input$case_count <- c(8, 10, 12, 14)
+scaled_data <- process_data_trio(scaled_input)
+scaled_fit <- suppressWarnings(BurdenMLE_DN(
+  scaled_input, component_endpoints = c(0, log(5)), prevalence = 0.8,
+  mutvar_est = FALSE, bootstrap = TRUE, n_boot = 4, bootstrap_seed = 47
+))
+factor <- 1.1
+old_point <- effective_penetrance_from_moments(
+  scaled_fit, precompute_effective_penetrance_moments(scaled_fit, scaled_data, factor),
+  0.8, scaled_data$case_rate
+)
+old_bootstrap <- vapply(seq_len(4), function(i) {
+  indices <- scaled_fit$bootstrap_output$bootstrap_indices[, i]
+  fitted <- scaled_fit
+  fitted$conditional_likelihood <- fitted$conditional_likelihood[indices, , drop = FALSE]
+  fitted$features <- fitted$features[indices, , drop = FALSE]
+  fitted$delta <- fitted$bootstrap_output$bootstrap_delta[[i]]
+  boot_data <- scaled_data[indices, , drop = FALSE]
+  effective_penetrance_from_moments(
+    fitted, precompute_effective_penetrance_moments(fitted, boot_data, factor),
+    0.8, boot_data$case_rate
+  )
+}, numeric(1))
+messages <- character()
+scaled_result <- withCallingHandlers(
+  scaled_peneff(scaled_fit, scaled_data, 0.8, factor),
+  warning = function(w) {
+    messages <<- c(messages, conditionMessage(w))
+    invokeRestart("muffleWarning")
+  }
+)
+stopifnot(
+  identical(scaled_result$peneff, old_point),
+  identical(c(scaled_result$peneff_lower, scaled_result$peneff_upper),
+            unname(quantile(old_bootstrap, c(0.025, 0.975)))),
+  sum(grepl("Bootstrap effective penetrance", messages, fixed = TRUE)) == 1L
+)
 
 cat("Model artifact manifest contract tests passed.\n")

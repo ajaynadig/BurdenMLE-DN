@@ -34,6 +34,12 @@ simplex-valid nonconverged uncertainty replicate remains in the interval and
 sets `uncertainty_reliable = FALSE`; a nonfinite or invalid replicate stops the
 uncertainty stage.
 
+Effective-penetrance summaries warn when non-finite or outside [0,1]. The
+excess-weighted ratio can be unstable near the null, and broad effect-size
+support can yield estimates above one. Values are not clipped. Finite
+out-of-range bootstrap estimates remain in the percentile interval; if any
+effective-penetrance replicate is non-finite, both interval endpoints are `NA`.
+
 When null simulation is requested, `mutvar_output$mutvar_p` includes null
 values tied with or above the observed mutational variance and uses the
 finite-null plus-one correction. Its minimum possible value is

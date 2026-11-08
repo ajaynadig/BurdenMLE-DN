@@ -26,6 +26,7 @@ for (source_file in c(
   "model.R", "secondary_analysis_functions.R"
 )) source(if (identical(source_file, "secondary_analysis_functions.R")) file.path(repo_dir, "analysis", "scripts", source_file) else file.path(repo_dir, "R", source_file))
 source(file.path(repo_dir, "analysis", "scripts", "model_artifacts.R"))
+source(file.path(repo_dir, "analysis", "scripts", "analysis_prevalence.R"))
 artifact_info <- load_model_artifact(
   model_manifest, "autism", envir = environment(),
   legacy_path = legacy_model_file
@@ -122,9 +123,7 @@ scenario_rows$gamma_scaling_factor <- vapply(scenario_rows$model_name, function(
   )$MLE
 }, numeric(1))
 scenario_rows$prevalence <- vapply(seq_len(nrow(scenario_rows)), function(i) {
-  factor_index <- if (scenario_rows$study[i] %in% c("SPARK", "ASC")) 1 else 2
-  autism_data$loop_vars$prevalences[model_index[[scenario_rows$model_name[i]]]] *
-    autism_data$prev_factors[factor_index]
+  analysis_prevalence(autism_data, scenario_rows$model_name[i])$prevalence
 }, numeric(1))
 
 results <- vector("list", nrow(scenario_rows))

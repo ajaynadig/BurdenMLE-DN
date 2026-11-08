@@ -1,7 +1,7 @@
 # Describe paternal age at U.S. births using the 2024 CDC/NCHS Natality
-# Public Use File. The compressed download is about 227 MB, but this script
-# streams father age directly from the archive and does not extract the full
-# multi-gigabyte fixed-width file.
+# Public Use File. Extract the archive once into inputs/demographics with a
+# Deflate64-capable unzip (e.g. macOS /usr/bin/unzip). R reads the plain-text
+# file in chunks; no external decompressor is needed during analysis.
 
 library(ggplot2)
 
@@ -39,14 +39,16 @@ dir.create(input_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
 
-source(file.path(repo_dir, "analysis", "scripts", "model_artifacts.R"))
-model_environment <- new.env(parent = globalenv())
-artifact_info <- load_model_artifact(
-  get_arg("--model-manifest", NA_character_), "autism",
-  envir = model_environment,
-  legacy_path = get_arg("--legacy-model-file", NA_character_)
+cohort_summary_file <- get_arg(
+  "--cohort-summary-file",
+  file.path(final_runs_dir, "outputs", "derived", "cohort_ddid", "cohort_sex_summary.rds")
 )
-model_file <- artifact_info$path
+cohort_summary <- readRDS(cohort_summary_file)
+spark_summary <- cohort_summary[cohort_summary$study == "SPARK" &
+                                 cohort_summary$sex == "Both", ]
+if (nrow(spark_summary) != 1L || abs(spark_summary$prevalence - 0.0276) > 1e-10) {
+  stop("Run summarize_cohort_sex.R first: SPARK must use prevalence 0.0276.")
+}
 
 zip_file <- file.path(input_dir, paste0("Nat", year, "us.zip"))
 if (!file.exists(zip_file)) {
@@ -55,25 +57,34 @@ if (!file.exists(zip_file)) {
 }
 
 archive_contents <- unzip(zip_file, list = TRUE)
+if (!nrow(archive_contents) || max(archive_contents$Length) <= 0) {
+  stop("CDC natality archive contains no nonempty data member.")
+}
 data_member <- archive_contents$Name[
   which.max(archive_contents$Length)
 ]
-message("Reading father age from archive member: ", data_member)
+data_file <- file.path(input_dir, data_member)
+if (!file.exists(data_file) ||
+    file.info(data_file)$size != max(archive_contents$Length)) {
+  stop("Extract the complete CDC archive into ", input_dir,
+       " before running this analysis. Expected file: ", data_member)
+}
+message("Reading father age from extracted file: ", data_file)
 
 # FAGECOMB occupies fixed-width positions 147-148 in the 2024 user guide.
 # Values 10-98 are reported ages; 99 and ages under 10 are not stated.
 age_counts <- integer(100)
 names(age_counts) <- as.character(0:99)
 birth_count <- 0L
-connection <- pipe(
-  paste("unzip -p", shQuote(zip_file), shQuote(data_member)),
-  open = "r"
-)
-on.exit(close(connection), add = TRUE)
+connection <- file(data_file, open = "r")
 
+tryCatch({
 repeat {
   lines <- readLines(connection, n = 100000L, warn = FALSE)
   if (length(lines) == 0) break
+  if (any(nchar(lines, type = "bytes") < 148L)) {
+    stop("CDC natality stream contains truncated fixed-width records.")
+  }
   # RESTATUS at position 104: codes 1-3 are residents of a U.S. state or DC;
   # code 4 identifies foreign residents whose births occurred in the U.S.
   residence_status <- suppressWarnings(as.integer(substr(lines, 104, 104)))
@@ -86,13 +97,15 @@ repeat {
     message(format(birth_count, big.mark = ","), " birth records processed")
   }
 }
-close(connection)
-on.exit(NULL, add = FALSE)
+}, finally = close(connection))
 
 known_ages <- 10:98
 known_counts <- age_counts[as.character(known_ages)]
 known_births <- sum(known_counts)
 unknown_births <- birth_count - known_births
+if (birth_count <= 0 || known_births <= 1) {
+  stop("CDC archive yielded no usable birth/age records; no summaries were written.")
+}
 
 weighted_quantile <- function(values, weights, probabilities) {
   cumulative <- cumsum(weights) / sum(weights)
@@ -314,41 +327,29 @@ write.csv(
   row.names = FALSE
 )
 
-# Apply the proportional correction to the selected PTV and Mis2 estimates.
-# Model indices are matched by name because
-# the streamlined model list may change order.
-model_names <- model_environment$autism_data$loop_vars$names
-target_names <- c("Combined Probands PTV", "Combined Probands Mis2")
-target_indices <- match(target_names, model_names)
-if (!anyNA(target_indices)) {
-    reported_mutvar <- vapply(
-      target_indices,
-      function(index) {
-        model_environment$BurdenMLE_DN_models_autism[[1]][[index]]$mutvar_output$total_mutvar
-      },
-      numeric(1)
-    )
-    mutvar_sensitivity <- data.frame(
-      variant_class = c(target_names, "Combined PTV + Mis2"),
-      reported_mutvar = c(reported_mutvar, sum(reported_mutvar)),
-      paternal_age_adjusted_mutvar = c(
-        reported_mutvar / mutation_rate_ratio,
-        sum(reported_mutvar) / mutation_rate_ratio
-      )
-    )
-    mutvar_sensitivity$absolute_change <-
-      mutvar_sensitivity$paternal_age_adjusted_mutvar -
-      mutvar_sensitivity$reported_mutvar
-    mutvar_sensitivity$percent_change <- 100 * (
-      mutvar_sensitivity$paternal_age_adjusted_mutvar /
-        mutvar_sensitivity$reported_mutvar - 1
-    )
-    write.csv(
-      mutvar_sensitivity,
-      file.path(table_dir, "spark_paternal_age_mutvar_sensitivity.csv"),
-      row.names = FALSE
-    )
-}
+# Apply the existing scalar sensitivity to SPARK at its cohort prevalence.
+# The cohort PTV estimate already includes the manuscript indel multiplier.
+reported_mutvar <- c(spark_summary$mutvar_ptv, spark_summary$mutvar_mis2)
+mutvar_sensitivity <- data.frame(
+  variant_class = c("SPARK Probands PTV", "SPARK Probands Mis2", "Combined PTV + Mis2"),
+  reported_mutvar = c(reported_mutvar, sum(reported_mutvar)),
+  paternal_age_adjusted_mutvar = c(
+    reported_mutvar / mutation_rate_ratio,
+    sum(reported_mutvar) / mutation_rate_ratio
+  )
+)
+mutvar_sensitivity$absolute_change <-
+  mutvar_sensitivity$paternal_age_adjusted_mutvar -
+  mutvar_sensitivity$reported_mutvar
+mutvar_sensitivity$percent_change <- 100 * (
+  mutvar_sensitivity$paternal_age_adjusted_mutvar /
+    mutvar_sensitivity$reported_mutvar - 1
+)
+write.csv(
+  mutvar_sensitivity,
+  file.path(table_dir, "spark_paternal_age_mutvar_sensitivity.csv"),
+  row.names = FALSE
+)
 
 print(mutation_sensitivity, row.names = FALSE)
 message(

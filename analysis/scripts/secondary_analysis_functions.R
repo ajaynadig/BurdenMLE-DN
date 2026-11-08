@@ -590,12 +590,16 @@ scaled_peneff <- function(model, genetic_data, prevalence, gamma_scaling_factor 
 
                                      genetic_data_boot = genetic_data[model$bootstrap_output$bootstrap_indices[,iter], , drop = FALSE]
 
-                                     effective_penetrance_func(model_boot,
-                                                               genetic_data_boot,
-                                                               prevalence,
-                                                               gamma_scaling_factor = gamma_scaling_factor)
+                                     moments_boot <- precompute_effective_penetrance_moments(
+                                       model_boot, genetic_data_boot, gamma_scaling_factor
+                                     )
+                                     effective_penetrance_from_moments(
+                                       model_boot, moments_boot, prevalence,
+                                       effective_penetrance_weights(genetic_data_boot)
+                                     )
                                    })
 
+  warn_effective_penetrance(bootstrap_peneff_ests, bootstrap = TRUE)
   peneff_CI = quantile(bootstrap_peneff_ests,c(0.025,0.975))
 
   peneff_df = data.frame(peneff = peneff,

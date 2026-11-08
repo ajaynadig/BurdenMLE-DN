@@ -45,6 +45,13 @@ spark_pedigree <- do.call(
 )
 age_phenotypes <- read.delim(phenotype_file)
 us_distribution <- read.csv(us_distribution_file)
+if (!nrow(us_distribution) ||
+    !all(c("father_age", "births") %in% names(us_distribution)) ||
+    any(!is.finite(us_distribution$father_age)) ||
+    any(!is.finite(us_distribution$births)) ||
+    any(us_distribution$births < 0) || sum(us_distribution$births) <= 1) {
+  stop("CDC father-age distribution is empty or invalid; rerun describe_us_father_age.R successfully first.")
+}
 
 if (anyDuplicated(spark_pedigree$Sample)) {
   stop("A Sample appears more than once across the combined SPARK pedigrees.")

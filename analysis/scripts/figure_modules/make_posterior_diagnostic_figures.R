@@ -33,15 +33,43 @@ theme_bhr_gridlines <- function() {
   )
 }
 
-BF_PosteriorMean_compare <- ggplot(
-  results$tada, aes(x = BF_PTV, y = Posterior_Mean)
-) +
-  geom_point() + scale_y_log10() + scale_x_log10() +
-  labs(x = "TADA Bayes Factor\n(PTV)",
-       y = "BurdenMLE-DN Posterior Mean Rate Ratio\n(PTV)") +
-  theme_bhr_gridlines()
+stopifnot(all(is.finite(results$tada$BF_PTV)), all(results$tada$BF_PTV > 0),
+          all(is.finite(results$tada$Posterior_Mean)), all(results$tada$Posterior_Mean > 0))
+xr <- range(log10(results$tada$BF_PTV))
+yr <- range(log10(results$tada$Posterior_Mean))
+xb <- seq(xr[1] - .001, xr[2] + .001, length.out = 61)
+yb <- seq(yr[1] - .001, yr[2] + .001, length.out = 41)
+comparison_plot <- function(data, title) {
+  rho <- cor(data$Posterior_Mean, data$BF_PTV, method = "spearman")
+  ggplot(data, aes(x = BF_PTV, y = Posterior_Mean)) +
+    stat_bin_2d(breaks = list(x = 10^xb, y = 10^yb)) +
+    scale_fill_gradient(low = "#d9e5ef", high = "#153d62", trans = "log10",
+                        limits = c(1, nrow(results$tada)), breaks = c(1,10,100,1000,10000),
+                        name = "Genes per bin",
+                        guide = guide_colourbar(barwidth = grid::unit(7, "cm"))) +
+    scale_y_log10(limits = 10^range(yb), breaks = c(1,3,10,30)) +
+    scale_x_log10(limits = 10^range(xb)) +
+    labs(title = title,
+         subtitle = sprintf("n = %s; Spearman ρ = %.3f",
+                            format(nrow(data), big.mark = ","), rho),
+         x = "TADA Bayes Factor\n(PTV)",
+         y = "BurdenMLE-DN Posterior Mean Rate Ratio\n(PTV)") +
+    theme_bw(base_size = 12) +
+    theme(axis.line = element_line(colour = "black"),
+          axis.text = element_text(color = "black"),
+          plot.title = element_text(size = 13), plot.tag = element_text(size = 22))
+}
+nominal_ptv <- !is.na(results$tada$p_PTV) & results$tada$p_PTV < 0.05
+a <- comparison_plot(results$tada, "All genes: binned density")
+b <- comparison_plot(results$tada[nominal_ptv, ], "Nominal PTV P < 0.05: binned density")
+stopifnot(sum(ggplot_build(a)$data[[1]]$count) == nrow(results$tada),
+          sum(ggplot_build(b)$data[[1]]$count) == sum(nominal_ptv))
+BF_PosteriorMean_compare <- (a + b) + plot_layout(ncol = 2, guides = "collect") +
+  plot_annotation(tag_levels = "A") & theme(legend.position = "bottom")
 ggsave(file.path(figure_dir, "SupplementaryFigure6_TADAComparison.pdf"), BF_PosteriorMean_compare,
-       device = cairo_pdf, width = 5, height = 5, dpi = "retina")
+       device = cairo_pdf, width = 11, height = 5.5, dpi = "retina")
+ggsave(file.path(figure_dir, "SupplementaryFigure6_TADAComparison.png"), BF_PosteriorMean_compare,
+       width = 11, height = 5.5, dpi = 180)
 
 # Coding-length comparison for the GER and neuronal-communication gene sets.
 # This was Supplementary Figure 5 in the original submission and remains a
@@ -69,13 +97,14 @@ length_summary <- data.frame(
   n = vapply(groups, function(group) sum(length_table$group == group), integer(1))
 )
 length_summary$label <- sprintf("%s\n(N = %s)", length_summary$group,
-                                format(length_summary$n, big.mark = ","))
+                                format(length_summary$n, big.mark = ",", trim = TRUE))
 GeneSetCDS_plot <- ggplot(
   length_summary,
   aes(x = factor(label, levels = label), y = median)
 ) +
   geom_col(width = 0.5, color = "black", fill = "white") +
   theme_bhr_gridlines() +
+  theme(axis.text.x = element_text(size = 11)) +
   labs(x = "Gene Set", y = "Coding Length\nMedian")
 ggsave(file.path(figure_dir, "SupplementaryFigure8_GeneSetCodingLength.pdf"),
        GeneSetCDS_plot, device = cairo_pdf, width = 5, height = 4, dpi = "retina")

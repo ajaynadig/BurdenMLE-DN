@@ -56,15 +56,24 @@ tada_keep <- tada[, c("Gene", "Gene_ID", "BF_PTV", "BF_Overall", "FDR", "Flag",
 tada_comparison <- merge(posterior, tada_keep, by = "Gene_ID", all = FALSE, sort = FALSE)
 tada_comparison <- tada_comparison[is.finite(tada_comparison$BF_PTV) &
                                      tada_comparison$BF_PTV > 0, ]
-tada_stats <- data.frame(
-  statistic = c("Spearman: posterior mean vs BF_PTV",
-                "Spearman: -log10 posterior P(RR<=1) vs BF_PTV"),
-  estimate = c(
-    cor(tada_comparison$Posterior_Mean, tada_comparison$BF_PTV,
-        method = "spearman", use = "complete.obs"),
-    cor(-log10(tada_comparison$Posterior_ProbLessEqualZero), tada_comparison$BF_PTV,
-        method = "spearman", use = "complete.obs")
+tada_statistics <- function(x, subset) {
+  data.frame(
+    subset = subset, n = nrow(x),
+    statistic = c("Spearman: posterior mean vs BF_PTV",
+                  "Spearman: -log10 posterior P(RR<=1) vs BF_PTV"),
+    estimate = c(
+      cor(x$Posterior_Mean, x$BF_PTV, method = "spearman", use = "complete.obs"),
+      cor(-log10(x$Posterior_ProbLessEqualZero), x$BF_PTV,
+          method = "spearman", use = "complete.obs")
+    )
   )
+}
+# Nominal P is an unadjusted signal-enrichment filter, not a discovery criterion.
+# Missing P values remain in the all-gene analysis and are excluded only here.
+nominal_ptv <- !is.na(tada_comparison$p_PTV) & tada_comparison$p_PTV < 0.05
+tada_stats <- rbind(
+  tada_statistics(tada_comparison, "All genes"),
+  tada_statistics(tada_comparison[nominal_ptv, ], "Nominal p_PTV < 0.05 (unadjusted)")
 )
 
 # gnomAD v4 contains gene-level and transcript-level rows. Select the canonical

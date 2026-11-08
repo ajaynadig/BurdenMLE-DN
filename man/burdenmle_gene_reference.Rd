@@ -15,4 +15,6 @@ LOEUF strata, and gene-level coding mutation rates used to construct the
 manuscript's baseline annotation features. Logical schema, mutation-rate,
 ordering, and stratum invariants are checked when the data are loaded. No
 cohort variant or count data are included.
+Counts and mutation-rate exposure must use compatible variant masks;
+see Satterstrom et al. (2026), doi:10.64898/2026.08.24.26360398.
 }

@@ -176,6 +176,8 @@ validate_burdenmle_loeuf_strata <- function(strata, reference) {
 #' manuscript's baseline annotation features. Logical schema, mutation-rate,
 #' ordering, and stratum invariants are checked when the data are loaded. No
 #' cohort variant or count data are included.
+#' Counts and mutation-rate exposure must use compatible variant masks;
+#' see Satterstrom et al. (2026), doi:10.64898/2026.08.24.26360398.
 #'
 #' @return A data frame with one row per gene.
 #' @export
@@ -188,6 +190,11 @@ burdenmle_gene_reference <- function() {
     path, stringsAsFactors = FALSE, check.names = FALSE
   )
   validate_burdenmle_gene_reference(reference)
+  message(
+    "Reference rates follow Satterstrom et al. (2026; ",
+    "doi:10.64898/2026.08.24.26360398). Match variant masks and callable ",
+    "exposure to your counts; PTV rates cover SNVs, not indels."
+  )
   reference
 }
 

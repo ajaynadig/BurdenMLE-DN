@@ -1,0 +1,53 @@
+repo_dir <- normalizePath(".")
+library(pbapply)
+for (f in c("BurdenMLE_DN.R", "EM.R", "MixSQP.R", "estimate_mutvar.R",
+            "io.R", "likelihoods.R", "model.R")) source(file.path("R", f))
+source("analysis/scripts/model_jobs.R")
+set.seed(12)
+before_rng <- .Random.seed
+b1 <- model_job_bootstraps(letters, 4L, 777L)
+stopifnot(identical(before_rng, .Random.seed))
+runif(123)
+b2 <- model_job_bootstraps(letters, 4L, 777L)
+stopifnot(identical(b1, b2))
+old_locale <- Sys.getlocale("LC_COLLATE")
+fingerprint <- model_job_code(repo_dir)
+Sys.setlocale("LC_COLLATE", "C")
+stopifnot(identical(fingerprint, model_job_code(repo_dir)))
+Sys.setlocale("LC_COLLATE", old_locale)
+snapshot_path <- tempfile(fileext = ".rds")
+snapshot_config <- list(seed = 777L)
+atomic_job_rds(list(config = snapshot_config, code = model_setup_code(repo_dir),
+                   objects = list(example = b1)), snapshot_path)
+writeLines(unname(tools::md5sum(snapshot_path)), paste0(snapshot_path, ".md5"))
+stopifnot(identical(read_model_setup(snapshot_path, snapshot_config, repo_dir)$example, b1))
+stopifnot(inherits(try(read_model_setup(snapshot_path, list(seed = 1L), repo_dir), silent = TRUE), "try-error"))
+saveRDS(list(changed = TRUE), snapshot_path)
+stopifnot(inherits(try(read_model_setup(snapshot_path, snapshot_config, repo_dir), silent = TRUE), "try-error"))
+unlink(c(snapshot_path, paste0(snapshot_path, ".md5")))
+dat <- read.csv("inst/extdata/synthetic_example.csv", row.names = "gene")
+draws <- with_local_seed(101L, replicate(3, sample(rownames(dat), replace = TRUE)))
+arguments <- list(input_data = dat, prevalence = .0276,
+                  component_endpoints = seq(0, log(100), length.out = 6),
+                  bootstrap_samples = draws, n_boot = 3, null_sim = FALSE)
+direct <- do.call(BurdenMLE_DN, arguments)
+job_dir <- tempfile("model-jobs-")
+dir.create(job_dir)
+path <- file.path(job_dir, "job.rds")
+prepare_model_job(arguments, "synthetic", path, repo_dir)
+execute_model_job(path, repo_dir)
+checkpoint <- read_model_job_result(path, repo_dir)
+for (field in c("delta", "ll", "prevalence", "mutvar_output", "penetrance", "bootstrap_output")) {
+  stopifnot(isTRUE(all.equal(direct[[field]], checkpoint[[field]], tolerance = 1e-12)))
+}
+before <- tools::md5sum(model_job_result(path))
+execute_model_job(path, repo_dir)
+stopifnot(identical(before, tools::md5sum(model_job_result(path))))
+changed <- arguments
+changed$prevalence <- .01
+stopifnot(inherits(try(prepare_model_job(changed, "synthetic", path, repo_dir), silent = TRUE), "try-error"))
+unpaired_path <- file.path(job_dir, "missing.rds")
+prepare_model_job(arguments, "missing", unpaired_path, repo_dir)
+stopifnot(inherits(try(read_model_job_result(unpaired_path, repo_dir), silent = TRUE), "try-error"))
+unlink(job_dir, recursive = TRUE)
+cat("Model job equivalence, reuse and stale/incomplete checks passed.\n")
