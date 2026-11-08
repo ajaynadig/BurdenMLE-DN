@@ -29,4 +29,6 @@ jobs:
         run: Rscript tests/reproduction_entry_points.R
       - name: Test shared workflow dependency and restart contracts
         run: python3 tests/workflow.py
+      - name: Test paired upper-bound sensitivity summaries
+        run: Rscript tests/upper_bound_pairs.R
       - uses: r-lib/actions/check-r-package@v2

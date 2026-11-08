@@ -35,7 +35,7 @@ PARENTS = {
     "checklist": ["tables", "posterior", "secondary", "paternal", "upper", "ddid"],
     "finalize": ["figure2", "figure3", "figure4", "supplementary", "checklist", "public_example"],
 }
-ARRAYS = {"model_fit": 245, "simulation_fit": 500, "upper_fit": 30}
+ARRAYS = {"model_fit": 245, "simulation_fit": 500, "upper_fit": 40}
 
 
 def sha(path):
