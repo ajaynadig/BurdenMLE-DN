@@ -10,15 +10,8 @@ if (length(repo_dir) && !is.na(repo_dir)) {
     file.path(repo_dir, "analysis", "reproduce_study.sh"), warn = FALSE
   )
 
-  matches <- regmatches(
-    reproduction,
-    gregexpr('\\$\\{SCRIPT_DIR\\}/[A-Za-z0-9_.-]+\\.R', reproduction)
-  )
-  stages <- unique(sub('^\\$\\{SCRIPT_DIR\\}/', '', unlist(matches)))
-  stopifnot(
-    length(stages) > 0L,
-    all(file.exists(file.path(scripts_dir, stages)))
-  )
+  stopifnot(any(grepl("workflow/run.py", reproduction, fixed=TRUE)),
+            file.exists(file.path(repo_dir,"analysis/workflow/run.py")))
 
   r_files <- list.files(
     scripts_dir, pattern = "\\.R$", recursive = TRUE, full.names = TRUE

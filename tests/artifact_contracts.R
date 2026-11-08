@@ -416,31 +416,8 @@ stopifnot(
              ), logical(1)))
 )
 
-runner_lines <- readLines("analysis/reproduce_study.sh", warn = FALSE)
-assert_manifest_route <- function(script, variable) {
-  line <- grep(paste0("/", script, "\\\""), runner_lines)
-  stopifnot(length(line) == 1L)
-  routed_lines <- runner_lines[line:min(length(runner_lines), line + 3L)]
-  stopifnot(any(grepl(variable, routed_lines, fixed = TRUE)))
-}
-main_consumers <- c(
-  "summarize_main_autism.R", "summarize_cohort_sex.R",
-  "forecasting_script_revision.R", "summarize_autism_dd.R",
-  "summarize_autism_dd_prevalence.R", "summarize_secondary_autism.R",
-  "summarize_posterior_diagnostics.R", "summarize_ddid.R",
-  "make_supplementary_tables.R",
-  "make_manuscript_estimate_table.R"
-)
-for (script in main_consumers) {
-  assert_manifest_route(script, "MAIN_MODEL_MANIFEST")
-}
-assert_manifest_route("summarize_no_overlap.R", "NO_OVERLAP_MODEL_MANIFEST")
-assert_manifest_route("make_supplementary_figures.R", "NO_CES_MODEL_MANIFEST")
-assert_manifest_route("describe_us_father_age.R", "--cohort-summary-file")
-stopifnot(
-  grep("/summarize_cohort_sex.R", runner_lines)[1] <
-    grep("/describe_us_father_age.R", runner_lines)[1]
-)
+# Workflow routing and dependency contracts are exercised in tests/workflow.py.
+stopifnot(file.exists("analysis/workflow/run.py"))
 
 # The manuscript scaling helper shares diagnostics but keeps its old numerical
 # calculation and quantile behavior. Test it against the explicit old formula.
