@@ -36,7 +36,7 @@ class WorkflowTests(unittest.TestCase):
         for stage in w.PARENTS:
             for command in w.commands(stage,self.c,1 if stage in w.ARRAYS else None):
                 self.assertTrue(Path(command[2]).is_file(),command)
-                self.assertNotIn("R2Nov", " ".join(command))
+                self.assertNotIn("R2Nov", " ".join(command).replace(str(REPO), "REPO").replace(self.c["root"], "ROOT"))
         commands = w.commands("cohort",self.c)[0]
         self.assertIn("--model-manifest",commands)
         self.assertTrue(commands[-1].endswith("model_manifest_main_manuscript_r2.rds"))
