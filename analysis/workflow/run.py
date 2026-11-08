@@ -78,7 +78,15 @@ def load_config(path):
             raise ValueError(f"manuscript-r2 requires {key}={value}")
     if not c["root"] or not Path(c["root"]).is_absolute():
         raise ValueError("Set root to an absolute analysis directory")
-    if c["forecast_cores"] < 1:
+    root = Path(c["root"]).resolve()
+    if root == REPO or REPO in root.parents:
+        raise ValueError("Keep run outputs outside the source checkout")
+    if c["bootstrap_draws"] and not Path(c["bootstrap_draws"]).is_absolute():
+        raise ValueError("bootstrap_draws must be an absolute path or empty")
+    for key in ("model_seed", "simulation_seed", "korean_seed"):
+        if type(c[key]) is not int or not 0 <= c[key] < 2**31 - 501:
+            raise ValueError("Invalid integer seed: " + key)
+    if type(c["forecast_cores"]) is not int or c["forecast_cores"] < 1:
         raise ValueError("forecast_cores must be positive")
     return c
 
