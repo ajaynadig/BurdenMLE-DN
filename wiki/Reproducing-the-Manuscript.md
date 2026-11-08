@@ -11,26 +11,26 @@ Authorized analysts should:
    [`analysis/input_manifest.tsv`](../analysis/input_manifest.tsv).
 3. Obtain each restricted input from its originating study authors and each
    public reference from the cited source.
-4. Run:
+4. Copy `analysis/workflow/manuscript.json`, set its absolute `root` and run identifier, and inspect the plan before executing:
 
 ```bash
-BURDENMLEDN_ANALYSIS_ROOT=/absolute/path/to/authorized_analysis_root \
-RUN_ALL=true \
-bash analysis/reproduce_study.sh
+bash analysis/reproduce_study.sh --config /path/to/run.json
+bash analysis/reproduce_study.sh --config /path/to/run.json --backend local --run
 ```
 
 The runner writes models, derived results, figures, tables, and logs beneath
-the supplied analysis root. Every stage is separately selectable through the
-`RUN_*` variables documented in
+the supplied analysis root. Local and SLURM execution share the same dependency
+graph. Select targets with `--stages`; explicitly validate/reuse completed stages
+with `--reuse`. The full study, cluster configuration, and reporting-only imports are documented in
 [`analysis/README.md`](../analysis/README.md).
 
 Every model-producing mode also writes
 `outputs/data/model_manifest_<mode>_<run-date>.rds`. Downstream stages load the
 exact artifact named in that manifest and validate its saved objects, gene
 order, full-fit status, and uncertainty status; they never choose a model by
-sorting filenames. Consumer-only reruns can select existing manifests with
-`MAIN_MODEL_MANIFEST`, `NO_CES_MODEL_MANIFEST`, and
-`NO_OVERLAP_MODEL_MANIFEST`. Unreliable bootstrap uncertainty warns without
+sorting filenames. Reporting-only rebuilds explicitly import validated approved
+results into a new root; they do not imply fresh model fitting. Direct R-script
+calls still accept `--model-manifest`. Unreliable bootstrap uncertainty warns without
 blocking a usable fit. Historical unmanifested files require an explicit
 `--legacy-...-model-file` option and always warn because their modern status
 and gene-universe contracts cannot be reconstructed.

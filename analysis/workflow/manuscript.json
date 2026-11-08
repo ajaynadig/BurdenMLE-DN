@@ -1,0 +1,25 @@
+{
+  "profile": "manuscript-r2",
+  "run_id": "manuscript_r2",
+  "root": "",
+  "bootstrap_draws": "",
+  "model_seed": 24312342,
+  "simulation_seed": 20260715,
+  "korean_seed": 20260721,
+  "bootstraps": 100,
+  "simulation_replicates": 500,
+  "comparison_replicates": 100,
+  "simulation_batch_size": 25,
+  "asd_rr_bound": 100,
+  "dd_rr_bound": 250,
+  "forecast_cores": 1,
+  "rscript": "Rscript",
+  "slurm": {
+    "partition": "medium",
+    "time": "5-00:00:00",
+    "memory_gb": 32,
+    "array_limit": null,
+    "image": "",
+    "binds": []
+  }
+}

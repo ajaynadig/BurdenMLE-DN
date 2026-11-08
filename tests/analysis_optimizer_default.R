@@ -39,10 +39,10 @@ if (length(cli_file) && !is.na(cli_file)) {
   stopifnot(any(grepl("default: mixsqp", help_output, fixed = TRUE)))
 
   reproduction <- readLines(
-    file.path(repo_dir, "analysis", "reproduce_study.sh"), warn = FALSE
+    file.path(repo_dir, "analysis", "workflow", "simulation_batches.R"), warn = FALSE
   )
   stopifnot(
-    any(grepl("--optimizer EM", reproduction, fixed = TRUE)),
-    any(grepl("--optimizer mixsqp", reproduction, fixed = TRUE))
+    any(grepl('c("mixsqp", if(job$compare_EM) "EM")', reproduction, fixed = TRUE)),
+    any(grepl("optimizer=method", reproduction, fixed = TRUE))
   )
 }
