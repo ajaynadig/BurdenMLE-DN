@@ -7,7 +7,7 @@ packages <- c("pbapply", "data.table", "ggplot2", "patchwork", "SummarizedExperi
 missing <- packages[!vapply(packages,requireNamespace,logical(1),quietly=TRUE)]
 if(length(missing)) stop("Install analysis dependencies before running: ",paste(missing,collapse=", "))
 lib <- file.path(root,"R-library")
-status <- system2(file.path(R.home("bin"),"R"),c("CMD","INSTALL","--library",shQuote(lib),shQuote(repo)))
+status <- system2(file.path(R.home("bin"),"R"),c("CMD","INSTALL",paste0("--library=",shQuote(lib)),shQuote(repo)))
 if(status != 0) stop("Package installation failed")
 writeLines(c(capture.output(sessionInfo()),capture.output(.libPaths())),file.path(root,"provenance/R_environment.txt"))
 write.table(as.data.frame(installed.packages()[,c("Package","Version","LibPath")]),
