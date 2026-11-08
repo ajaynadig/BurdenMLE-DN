@@ -201,7 +201,7 @@ if [[ "${RUN_SUPPLEMENTARY_FIGURES}" == "true" ]]; then
     --model-manifest "${NO_OVERLAP_MODEL_MANIFEST}"
   run_step "describe_us_father_age" \
     "${R_BIN}" "${SCRIPT_DIR}/describe_us_father_age.R" \
-    --model-manifest "${MAIN_MODEL_MANIFEST}"
+    --cohort-summary-file "${FINAL_RUNS_DIR}/outputs/derived/cohort_ddid/cohort_sex_summary.rds"
   run_step "compare_spark_us_father_age" \
     "${R_BIN}" "${SCRIPT_DIR}/compare_spark_us_father_age.R"
   run_step "make_supplementary_figures" \
