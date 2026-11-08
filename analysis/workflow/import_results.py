@@ -18,6 +18,9 @@ def main():
     w.initialize(c)
     stages=("models","simulations","upper","korean","public_example")
     if any(w.record_path(c,s).exists() for s in stages): raise RuntimeError("Imported stages already exist")
+    # Reporting still reads raw inputs. Pin those inputs and the installed
+    # environment just as for a fresh run, before copying expensive fit files.
+    subprocess.run([c["rscript"],"--vanilla",str(w.HERE/"preflight.R")],env=w.environment(c),check=True)
     # Copy data products, not old reporting summaries. Model manifests are
     # relocated and validated below; no absolute reference to source fits remains.
     patterns=[f"outputs/data/models*_{c['run_id']}.Rdata",f"outputs/data/model_manifest_*_{c['run_id']}.rds",

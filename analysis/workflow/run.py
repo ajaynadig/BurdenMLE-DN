@@ -342,16 +342,11 @@ def main():
     parser.add_argument("--execute-stage", choices=PARENTS, help=argparse.SUPPRESS)
     parser.add_argument("--task", type=int, help=argparse.SUPPRESS)
     args = parser.parse_args()
-    legacy = {"RUN_MAIN_MODELS": "models", "RUN_NO_CES_MODELS": "models", "RUN_NO_OVERLAP_MODELS": "models",
-              "RUN_SIMULATIONS": "simulations", "RUN_SIMULATION_ANALYSIS": "simulations", "RUN_KOREAN_WGS": "korean",
-              "RUN_MAIN_FIGURES": "figure2", "RUN_FORECASTING": "figure3", "RUN_AUTISM_DD_FIGURES": "figure4",
-              "RUN_SUPPLEMENTARY_FIGURES": "supplementary", "RUN_SUPPLEMENTARY_TABLES": "tables", "RUN_MANUSCRIPT_ESTIMATES": "checklist"}
-    selected = [v for k,v in legacy.items() if os.environ.get(k) == "true"]
-    if os.environ.get("RUN_ALL") == "true": selected = ["finalize"]
-    if selected and not args.execute_stage:
-        args.stages = ",".join(dict.fromkeys(selected)); args.run = True
-        print("RUN_* compatibility: targets include dependencies; use --reuse for completed stages.", file=sys.stderr)
-    if len(sys.argv) == 1 and not selected:
+    legacy = sorted(k for k in os.environ if k.startswith("RUN_") and k != "RUN_DATE")
+    if legacy:
+        parser.error("Legacy selectors are no longer supported: " + ", ".join(legacy) +
+                     ". Unset them; use --stages and --reuse, inspect the plan, then add --run.")
+    if len(sys.argv) == 1:
         parser.print_help(); return
     c = load_config(args.config)
     if args.execute_stage:

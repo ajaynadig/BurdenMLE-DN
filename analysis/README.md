@@ -61,8 +61,10 @@ implicitly reused. `--reuse models` verifies a completed models stage and stops
 dependency traversal there. To rerun reporting from existing results, select the
 required targets and explicitly reuse their completed dependencies. Existing
 completed stages are not overwritten. Use a new root for changed code/settings.
-The legacy RUN_ALL/RUN_* selectors map to graph targets; unlike the former shell
-runner, dependencies are included. Inspect the plan and use `--reuse` explicitly.
+Legacy RUN_ALL/RUN_* selectors are rejected, including flags set to false; unset
+them and migrate to explicit `--stages`/`--reuse`. This avoids silently broadening
+old partial-run commands. RUN_DATE remains a supported run identifier when using
+the default configuration. No environment selector implicitly authorizes launch.
 
 ## Rebuild reporting from approved fits
 
@@ -77,7 +79,8 @@ bash analysis/reproduce_study.sh --config /path/to/report.json --run \
 ```
 
 Provide the authorized inputs and an installed analysis environment in the new
-root as above. Import copies selected fitted/result artifacts, records source
+root as above. Import runs preflight to record raw-input, draw and environment
+identities, then copies selected fitted/result artifacts, records source
 hashes, relocates model manifests to the copies, and validates their schema and
 fit records. It does not copy empirical reporting summaries or forecasts. The
 import manifest explicitly labels this as a reporting rebuild, not fresh fitting.

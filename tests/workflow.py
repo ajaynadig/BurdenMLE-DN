@@ -2,6 +2,8 @@
 import importlib.util
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -71,6 +73,15 @@ class WorkflowTests(unittest.TestCase):
         with patch.object(w,"commands",return_value=[["false"]]):
             with self.assertRaises(w.subprocess.CalledProcessError): w.execute(self.c,"prepare")
         self.assertFalse(w.record_path(self.c,"prepare").exists())
+
+    def test_legacy_flags_cannot_broaden_a_run(self):
+        env = {k:v for k,v in os.environ.items() if not k.startswith("RUN_")}
+        env.update(RUN_ALL="true", RUN_MAIN_MODELS="false")
+        result = subprocess.run([sys.executable, str(w.HERE / "run.py")],
+                                env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("Unset them; use --stages and --reuse", result.stderr)
+        self.assertFalse((Path(self.tmp.name) / "workflow").exists())
 
 
 if __name__ == "__main__": unittest.main()
