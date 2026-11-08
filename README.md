@@ -37,6 +37,9 @@ set `bootstrap = TRUE` and choose `n_boot`.
 
 ## Documentation
 
+- [Public Kaplanis developmental-disorder example](inst/examples/kaplanis/README.md):
+  downloads published counts and runs PTV/synonymous analyses. This is a
+  demonstration, not the manuscript's developmental-disorder analysis.
 - [Input data and model parameters](wiki/Input-Data-and-Model-Parameters.md)
 - [Output fields](wiki/Output-Fields.md)
 - [Worked example](wiki/Worked-Example.md)
