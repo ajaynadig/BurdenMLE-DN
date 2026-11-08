@@ -7,6 +7,7 @@ dir.create(out,recursive=TRUE,showWarnings=FALSE)
 for(f in list.files(file.path(repo,"R"),"[.]R$",full.names=TRUE)) source(f)
 source(file.path(repo,"analysis/scripts/secondary_analysis_functions.R"))
 source(file.path(repo,"analysis/scripts/model_jobs.R"))
+source(file.path(repo,"analysis/workflow/upper_bound_helpers.R"))
 moments <- function(m, d, legacy_grid = FALSE) {
   u <- if (legacy_grid) seq(.05, 1, by = 1 / m$grid_size) else midpoint_grid(m$grid_size)
   a <- b <- f <- matrix(0, nrow(d), length(m$component_endpoints))
@@ -37,8 +38,10 @@ if(stage=="prepare") {
   dd <- read.table(file.path(root,"inputs/developmental_disorder/kaplanis_variants_GRCh38_annotated_formatted_2024-11-23.txt"),header=TRUE)
   dd_scale <- sum(dd$isPTV,na.rm=TRUE)/sum(dd$isPTV & !dd$isIndel,na.rm=TRUE)
   paths <- c("Combined_Probands_PTV_cap100_p01_m001.rds",
-             "Combined_Probands_PTV_cap100_p01_m003.rds","Proband_PTV_cap250_p01_m001.rds")
-  names(paths) <- c("Combined Probands PTV","Combined Probands Mis2","Developmental disorders PTV")
+             "Combined_Probands_PTV_cap100_p01_m003.rds","Proband_PTV_cap250_p01_m001.rds",
+             "Proband_PTV_cap250_p01_m003.rds")
+  names(paths) <- c("Combined Probands PTV","Combined Probands Mis2","Developmental disorders PTV",
+                    "Developmental disorders Mis2")
   ces <- unique(read.delim(file.path(root,"inputs/gene_exclusions/updated_CES_genes_TableS36.tsv"))[[1]])
   map <- read.delim(file.path(root,"inputs/constraint/gnomad.v4.1.constraint_metrics.tsv"))
   stopifnot(all(ces %in% map$gene))
@@ -48,14 +51,13 @@ if(stage=="prepare") {
     a <- readRDS(file.path(root,file.path("jobs", Sys.getenv("RUN_DATE"), "main"),paths[i]))$arguments
     keep <- !rownames(a$input_data) %in% ids
     d <- a$input_data[keep,,drop=FALSE]; f <- a$features[keep,,drop=FALSE]
-    set.seed(if(i==3) 20261104L else 20261103L)
+    set.seed(if(i>=3) 20261104L else 20261103L)
     draws <- replicate(100,sample.int(nrow(d),nrow(d),replace=TRUE))
     xs[[names(paths)[i]]] <- list(input=d,features=f,draws=draws,
-      prevalence=a$prevalence,scale=c(asd_scale,1,dd_scale)[i])
+      prevalence=a$prevalence,scale=c(asd_scale,1,dd_scale,1)[i])
     reports[[i]] <- data.frame(model=names(paths)[i],gene_id=rownames(a$input_data)[!keep])
   }
-  stopifnot(identical(rownames(xs[[1]]$input),rownames(xs[[2]]$input)),
-            identical(xs[[1]]$draws,xs[[2]]$draws))
+  validate_upper_bound_pairs(xs)
   caps <- sort(unique(c(1/xs[[1]]$prevalence,60,80,100,125,150,200,250,300,400)))
   inventory <- expand.grid(RR_cap=caps,model=names(xs),stringsAsFactors=FALSE)
   saveRDS(list(models=xs,inventory=inventory),workspace)
@@ -83,21 +85,19 @@ if(stage=="prepare") {
   w <- readRDS(workspace)
   z <- lapply(seq_len(nrow(w$inventory)),function(i) {
     a <- readRDS(file.path(out,sprintf("job_%02d.rds",i)))
-    stopifnot(identical(a$job,w$inventory[i,])); a
+    stopifnot(identical(a$job$model,w$inventory$model[i]),
+              identical(a$job$RR_cap,w$inventory$RR_cap[i])); a
   })
   d <- do.call(rbind,lapply(z,`[[`,"draws"))
-  stopifnot(nrow(d)==9090,!anyDuplicated(d[c("model","RR_cap","replicate","metric")]))
+  validate_upper_bound_pairs(w$models)
+  stopifnot(nrow(d)==nrow(w$inventory)*101L*3L,!anyDuplicated(d[c("model","RR_cap","replicate","metric")]))
   write.table(d,file.path(out,"full_metric_class_draws.tsv"),sep="\t",row.names=FALSE,quote=FALSE)
   points <- do.call(rbind,lapply(z,function(a) data.frame(a$job,log_likelihood=a$log_likelihood)))
-  points$dataset <- ifelse(points$model=="Developmental disorders PTV","DD: PTV","ASD: PTV + Mis2")
+  points$dataset <- ifelse(grepl("^Developmental disorders ",points$model),"DD: PTV + Mis2","ASD: PTV + Mis2")
   pooled <- aggregate(log_likelihood~RR_cap+dataset,points,sum)
   pooled$loglik_difference_from_best <- ave(pooled$log_likelihood,pooled$dataset,FUN=function(x)x-max(x))
   write.table(pooled,file.path(out,"pooled_estimates.tsv"),sep="\t",row.names=FALSE,quote=FALSE)
-asd<-aggregate(estimate~RR_cap+replicate+metric,subset(d,model!="Developmental disorders PTV"&metric!="effective_penetrance"),sum)
-asd<-rbind(asd,subset(d,model=="Combined Probands PTV"&metric=="effective_penetrance",select=c(RR_cap,replicate,metric,estimate)))
-asd$dataset<-"ASD"
-dd<-subset(d,model=="Developmental disorders PTV",select=c(RR_cap,replicate,metric,estimate));dd$dataset<-"DD"
-all<-rbind(asd,dd)
+all<-pool_upper_bound_draws(d)
 s<-subset(all,replicate==0);s$replicate<-NULL
 for(i in seq_len(nrow(s))) {
   v<-subset(all,replicate>0&RR_cap==s$RR_cap[i]&metric==s$metric[i]&dataset==s$dataset[i])$estimate
@@ -127,6 +127,7 @@ p<-ggplot(s,aes(RR_cap,value,color=dataset))+
   theme(legend.position="none",panel.grid.minor=element_blank(),strip.background=element_rect(fill="grey95"))
 ggsave(file.path(out,"UpperRRSweep_all_metrics.pdf"),p,width=10,height=11,device=cairo_pdf)
 ggsave(file.path(out,"UpperRRSweep_all_metrics.png"),p,width=10,height=11,dpi=180)
-cat("Finished: 30 point fits and 3000 bootstrap results, all three metrics.\n")
+cat(sprintf("Finished: %d point fits and %d bootstrap results, all three metrics.\n",
+            nrow(w$inventory),100L*nrow(w$inventory)))
 
 } else stop("Expected prepare, worker or collect")

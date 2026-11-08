@@ -29,6 +29,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(w.selection(["finalize"]), list(w.PARENTS))
         self.assertIn("paternal", w.selection(["supplementary"]))
         self.assertIn("upper", w.selection(["checklist"]))
+        self.assertEqual(w.ARRAYS["upper_fit"], 40)
 
     def test_commands_and_manifest_routes(self):
         # Model job paths are produced during prepare; exercise the real reader.

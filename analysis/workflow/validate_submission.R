@@ -1,4 +1,7 @@
 root <- normalizePath(Sys.getenv("BURDENMLEDN_ANALYSIS_ROOT"))
+sensitivity <- read.delim(file.path(root,"outputs/derived/upper_rr_no_CES/pooled_estimates.tsv"))
+stopifnot(nrow(sensitivity)==20L,
+          setequal(unique(sensitivity$dataset),c("ASD: PTV + Mis2","DD: PTV + Mis2")))
 cohort <- readRDS(file.path(root,"outputs/derived/cohort_ddid/cohort_sex_summary.rds"))
 stopifnot(all(cohort$prevalence[cohort$sex=="Both" & cohort$study %in% c("ASC","SPARK")]==.0276),
           all(cohort$prevalence[cohort$sex=="Both" & cohort$study %in% c("GeneDx","GeneDX")]==.01))
