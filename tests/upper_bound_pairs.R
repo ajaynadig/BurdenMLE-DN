@@ -1,4 +1,16 @@
 source("analysis/workflow/upper_bound_helpers.R")
+# Inspect the actual worker call so quadrature resolution cannot drift away from
+# the primary analysis while the ten mixture components remain unchanged.
+calls <- list()
+walk <- function(x) {
+  if (missing(x)) return(invisible(NULL))
+  if (is.call(x) && identical(x[[1]], as.name("initialize_model")))
+    calls[[length(calls) + 1L]] <<- x
+  if (is.call(x) || is.expression(x)) for (y in as.list(x)) walk(y)
+}
+walk(parse("analysis/workflow/upper_bound_jobs.R"))
+stopifnot(length(calls) == 1L, identical(eval(calls[[1]][[6]]), 10))
+cat("PASS sensitivity worker uses ten integration points per component\n")
 fails <- function(expr) inherits(tryCatch(force(expr), error = identity), "error")
 d <- expand.grid(model = unlist(upper_bound_pairs), RR_cap = c(100, 250),
                  replicate = 0:3, metric = c("mutvar", "fraction_cases_RR5", "effective_penetrance"),
