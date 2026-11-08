@@ -9,6 +9,9 @@
 analysis/inputs/
 analysis/outputs/
 analysis/logs/
+analysis/R-library/
+analysis/workflow/__pycache__/
+tests/__pycache__/
 
 # Common count- and variant-table formats.
 *.vcf

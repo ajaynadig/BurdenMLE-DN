@@ -44,6 +44,8 @@ set `bootstrap = TRUE` and choose `n_boot`.
 - [Output fields](wiki/Output-Fields.md)
 - [Worked example](wiki/Worked-Example.md)
 - [Reproducing the manuscript](wiki/Reproducing-the-Manuscript.md)
+  uses a shared local/SLURM workflow with explicit configuration, bootstrap
+  draws, dependency checks, and numbered submission exports.
 - [Citation](wiki/Citation.md)
 
 The package does **not** distribute individual-level variants, gene-level

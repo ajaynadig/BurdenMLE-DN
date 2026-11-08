@@ -1,52 +1,110 @@
 # Manuscript reproduction
 
-This directory contains the scripts used for the BurdenMLE-DN manuscript.
-Model fitting, summaries, figures, tables, and the manuscript-estimate
-checklist are selected through `reproduce_study.sh`.
+`reproduce_study.sh` runs one dependency graph locally or on SLURM. The package
+and [public Kaplanis example](../inst/examples/kaplanis/README.md) do not require
+the authorized manuscript inputs. The example is not the manuscript DD analysis.
 
-The manuscript cohort inputs are **not distributed in this repository**.
-They include embargoed gene-count and variant tables governed by the
-originating study authors. Authorized analysts should create an analysis root
-with the directory structure in `input_manifest.tsv`, then run:
+## Prepare an environment and inputs
+
+Use Python 3.9+ and R with the package dependencies plus the analysis dependencies
+checked by `workflow/preflight.R` (including Bioconductor SummarizedExperiment,
+ggplot2, patchwork, data.table, readr, dplyr, tidyr, scales, MetBrewer, openxlsx,
+and digest). Preflight installs this checkout of BurdenMLEDN into the run's own
+`R-library` and records installed package versions. It does not install missing
+analysis dependencies automatically. For SLURM, provide the same environment on
+every node, optionally through `slurm.image` and explicit `slurm.binds`.
+
+Place authorized inputs in `<root>/inputs/` using `input_manifest.tsv`. Counts and
+variant tables are governed by their originating studies and are not on GitHub.
+The public CDC/NCHS `Nat2024us.zip` archive must also be extracted under
+`inputs/demographics/` before launch. It uses Deflate64: use a compatible unzip
+(for example macOS `/usr/bin/unzip`). Preflight verifies the extracted member's
+size and hashes the inputs; compute jobs read the extracted text directly.
+
+Copy `workflow/manuscript.json` outside the repository and set `root` to a new
+absolute directory and `run_id` to a stable identifier. Set `bootstrap_draws` to
+the approved directory of saved gene-ID draws to reproduce manuscript resamples;
+leave it empty to generate new deterministic draws. Do not expect a seed alone
+to reconstruct draws made by a different historical execution order. Saved draws
+are validated against each model's ordered gene universe and bootstrap count.
+They may contain restricted identifiers and are not distributed here.
+
+The `manuscript-r2` profile fixes 100 gene bootstraps, 500 main simulation
+replicates, 100 matched optimizer-comparison replicates, 25 replicates per batch,
+and upper RR bounds 100/250. `analysis_prevalence.R` selects pooled, clinical,
+or population scenarios from the original setup definitions: combined-sex
+ASC/SPARK use 2.76%, GeneDx 1%, and pooled ASD remains unchanged. Stratum-specific
+prevalences remain stratum-specific. Reporting verifies agreement with saved fits.
+
+## Run
 
 ```bash
-BURDENMLEDN_ANALYSIS_ROOT=/absolute/path/to/authorized_analysis_root \
-RUN_ALL=true \
-bash analysis/reproduce_study.sh
+# Print the entire graph without launching anything.
+bash analysis/reproduce_study.sh --config /path/to/run.json
+
+# Same stages and random inputs, executed sequentially on this machine:
+bash analysis/reproduce_study.sh --config /path/to/run.json --backend local --run
+
+# Run this command on a SLURM submission host (sbatch must be on PATH):
+bash analysis/reproduce_study.sh --config /path/to/run.json --backend slurm --run
 ```
 
-If `BURDENMLEDN_ANALYSIS_ROOT` is omitted, the runner uses this `analysis/`
-directory. Its `inputs/`, `outputs/`, and `logs/` directories are ignored by
-Git.
+SLURM uses after-success dependencies and independent model, simulation and
+sensitivity arrays. `slurm.array_limit` is null by default (no application-level
+cap); scheduler/account limits still apply. `forecast_cores` controls deterministic
+within-job forecasting parallelism. SLURM settings contain no lab-specific paths.
+Local execution blocks until completion; SLURM execution records job IDs in
+`workflow/submitted.json` and returns after submission, not after completion.
 
-All stages are opt-in unless `RUN_ALL=true`. Individual stages can be selected
-with the `RUN_*` variables declared near the top of `reproduce_study.sh`.
-`RUN_DATE`, seeds, bootstrap counts, and R executable can also be set as
-environment variables.
+`--stages figure2,figure3` selects targets and their dependencies. Nothing is
+implicitly reused. `--reuse models` verifies a completed models stage and stops
+dependency traversal there. To rerun reporting from existing results, select the
+required targets and explicitly reuse their completed dependencies. Existing
+completed stages are not overwritten. Use a new root for changed code/settings.
+The legacy RUN_ALL/RUN_* selectors map to graph targets; unlike the former shell
+runner, dependencies are included. Inspect the plan and use `--reuse` explicitly.
 
-Manual `run_models.R` invocations default to the package's MixSQP optimizer.
-Use `--optimizer EM` to request the retained legacy optimizer explicitly. The
-simulation workflow intentionally invokes both optimizers for comparison.
+## Rebuild reporting from approved fits
 
-Each `run_models.R` invocation writes a manifest beside its model output:
-`model_manifest_<mode>_<run-date>.rds`. The manifest records the exact
-normalized artifact path, gene order, fit status, uncertainty reliability,
-active model settings, and repository commit. Downstream scripts accept the
-selected manifest through `--model-manifest`; the no-CES figure module uses
-`--no-ces-model-manifest`. They do not search for the lexically latest model.
+This is a different operation from a fresh full study. Import into a new root
+with the same run_id as the approved source:
 
-The runner derives these paths from `RUN_DATE`. To rerun only downstream
-stages from existing fits, keep the same `RUN_DATE` or set
-`MAIN_MODEL_MANIFEST`, `NO_CES_MODEL_MANIFEST`, and
-`NO_OVERLAP_MODEL_MANIFEST` explicitly. A selected full fit must be usable and
-converged. Unreliable bootstrap uncertainty produces a warning but remains
-loadable, matching the package uncertainty policy.
+```bash
+python3 analysis/workflow/import_results.py --config /path/to/report.json \
+  --source /path/to/approved/run
+bash analysis/reproduce_study.sh --config /path/to/report.json --run \
+  --reuse models,simulations,upper,korean,public_example
+```
 
-Unmanifested historical artifacts are available only through an explicitly
-named legacy option such as `--legacy-model-file`,
-`--legacy-autism-model-file`, or `--legacy-ddd-model-file`. This route always
-warns and can validate only the historical file's expected top-level objects;
-it does not supply modern status or gene-universe guarantees.
+Provide the authorized inputs and an installed analysis environment in the new
+root as above. Import copies selected fitted/result artifacts, records source
+hashes, relocates model manifests to the copies, and validates their schema and
+fit records. It does not copy empirical reporting summaries or forecasts. The
+import manifest explicitly labels this as a reporting rebuild, not fresh fitting.
 
-The scripts are released for transparency and exact reproduction. The
-installable package and synthetic example do not require manuscript inputs.
+## Outputs, checks, and restart
+
+`outputs/` holds analysis products; `submission/` holds numbered figures, ten
+supplementary TSVs and the combined workbook, numbering maps, and the 214-row
+manuscript checklist. `provenance/` records input/environment/output identities;
+`workflow/` records configuration, code hashes, stage completion and submitted
+jobs. Logs are per stage/task. Historical R2 comparisons are optional external
+audit work, not a dependency of ordinary reproduction.
+
+Completion markers are written only after success. Reuse checks recorded output
+hashes and configuration/code identity. Failed workers do not release dependent
+SLURM jobs. Inspect failures and any stale locks before retrying; do not remove a
+lock while its worker is alive. A submission ledger prevents accidental duplicate
+submission. Archive it only after checking all previously submitted jobs have
+finished or been cancelled. A stage that failed after producing partial outputs
+may require a fresh root; the runner favors refusing ambiguous overwrites.
+
+The generated workbook is read back and compared to its TSVs. Automated checks
+do not replace visual inspection or manuscript cross-reference review. Freeze
+only after those checks and pin the code commit plus configuration, input/draw
+hashes, environment, and output manifest. Inputs must remain available under
+their access rules; external symlinks are not an independent archive.
+
+Developer tests: run `python3 tests/workflow.py` and the R scripts in `tests/`
+from a source checkout with the package installed. Native SLURM submission and
+the authorized-data reporting rebuild require their respective environments.
