@@ -5,6 +5,7 @@
 ^tests/artifact_contracts\.R$
 ^tests/analysis_prevalence\.R$
 ^tests/model_jobs\.R$
+^tests/upper_bound_pairs\.R$
 ^data-raw$
 ^tools$
 ^wiki$
