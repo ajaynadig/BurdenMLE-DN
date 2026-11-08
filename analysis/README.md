@@ -41,6 +41,8 @@ bounds (40 tasks, each with 100 bootstraps). Within each disorder, the classes
 share ordered genes and bootstrap draws. Likelihood, variance, and case fraction
 combine PTV + Mis2; effective penetrance is PTV-only for both disorders.
 PTV variance and case fractions include the same indel scaling as the main analyses.
+Each mixture component uses ten midpoint integration points, matching the primary
+analyses; varying the upper bound does not change the integration resolution.
 
 ## Run
 

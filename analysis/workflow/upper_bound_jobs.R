@@ -68,7 +68,8 @@ if(stage=="prepare") {
   job <- w$inventory[id,]; x <- w$models[[job$model]]
   path <- file.path(out,sprintf("job_%02d.rds",id))
   if(file.exists(path)) stop("Refusing to overwrite completed sensitivity job")
-  t <- initialize_model(poisson_uniform_likelihood,x$input,seq(0,log(job$RR_cap),length.out=10),x$features,100)
+  # Match the primary analyses: ten midpoint integration points per component.
+  t <- initialize_model(poisson_uniform_likelihood,x$input,seq(0,log(job$RR_cap),length.out=10),x$features,10)
   q <- moments(t,x$input); rows <- list(); ll <- NA_real_
   for(i in 0:100) {
     idx <- if(i==0) seq_len(nrow(x$input)) else x$draws[,i]

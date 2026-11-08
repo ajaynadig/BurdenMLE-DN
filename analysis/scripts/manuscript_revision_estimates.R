@@ -79,7 +79,7 @@ for (i in seq_len(nrow(sweep))) {
           manuscript_ready=format_percent_ci(z$estimate,z$lower95,z$upper95),
           status="R2_CES_excluded_sensitivity", source_file=sweep_file,
           source_key=paste(z$dataset,z$RR_cap,z$metric),
-          notes="Supplementary Figure 17; CES genes excluded. Variance/case fractions combine PTV+Mis2 for both ASD and DD; penetrance is PTV only. Not a primary estimate.")
+          notes="Supplementary Figure 17; CES genes excluded; ten integration points per component, matching primary analyses. Variance/case fractions combine PTV+Mis2 for both ASD and DD; penetrance is PTV only. Not a primary estimate.")
 }
 ll_file <- file.path(derived_dir,"upper_rr_no_CES","pooled_estimates.tsv")
 ll <- read_tsv(ll_file)
