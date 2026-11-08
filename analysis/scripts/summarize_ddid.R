@@ -26,6 +26,7 @@ for (source_file in c(
   source(if (identical(source_file, "secondary_analysis_functions.R")) file.path(repo_dir, "analysis", "scripts", source_file) else file.path(repo_dir, "R", source_file))
 }
 source(file.path(repo_dir, "analysis", "scripts", "model_artifacts.R"))
+source(file.path(repo_dir, "analysis", "scripts", "analysis_prevalence.R"))
 artifact_info <- load_model_artifact(
   model_manifest, "autism", envir = environment(),
   legacy_path = legacy_model_file
@@ -75,9 +76,8 @@ max_strata <- as.vector(outer(
 strata <- c(combined_strata, max_strata)
 
 summarize_stratum <- function(stratum) {
-  is_genedx <- grepl("GeneDx$", stratum)
-  model_set_index <- if (is_genedx) 3L else 1L
-  prevalence_factor_index <- if (is_genedx) 2L else 1L
+  scenario <- analysis_prevalence(autism_data, paste(stratum, "PTV"))
+  model_set_index <- scenario$factor_index
   ptv_index <- model_index[[paste(stratum, "PTV")]]
   mis2_index <- model_index[[paste(stratum, "Mis2")]]
   if (is.null(ptv_index) || is.null(mis2_index)) stop("Missing fitted stratum: ", stratum)
@@ -85,8 +85,15 @@ summarize_stratum <- function(stratum) {
   mis2_model <- BurdenMLE_DN_models_autism[[model_set_index]][[mis2_index]]
   ptv_data <- get_genetic_data(ptv_index, autism_data)$genetic_data
   mis2_data <- get_genetic_data(mis2_index, autism_data)$genetic_data
-  prevalence <- autism_data$loop_vars$prevalences[ptv_index] *
-    autism_data$prev_factors[prevalence_factor_index]
+  prevalence <- scenario$prevalence
+  assert_fit_prevalence(ptv_model, prevalence, paste(stratum, "PTV"))
+  assert_fit_prevalence(mis2_model, prevalence, paste(stratum, "Mis2"))
+  peneff <- ptv_model$penetrance$effective_penetrance
+  peneff_ci <- ptv_model$penetrance$effective_penetrance_CI
+  if (!identical(ptv_model$bootstrap_output$bootstrap_samples,
+                 mis2_model$bootstrap_output$bootstrap_samples)) {
+    stop("PTV/Mis2 bootstrap samples are not paired for ", stratum)
+  }
   n_boot <- min(length(ptv_model$bootstrap_output$bootstrap_delta),
                 length(mis2_model$bootstrap_output$bootstrap_delta))
   mutvar <- exact_mutvar(ptv_model, ptv_data, prevalence) * autism_data$ptv_scale_factor +
@@ -110,12 +117,12 @@ summarize_stratum <- function(stratum) {
     fraccase_RR5 = frac,
     fraccase_RR5_lower = unname(quantile(frac_boot, 0.025)),
     fraccase_RR5_upper = unname(quantile(frac_boot, 0.975)),
-    PTV_peneff = ptv_model$penetrance$effective_penetrance,
-    PTV_peneff_lower = ptv_model$penetrance$effective_penetrance_CI[1],
-    PTV_peneff_upper = ptv_model$penetrance$effective_penetrance_CI[2],
-    PTV_effRR = ptv_model$penetrance$effective_penetrance / prevalence,
-    PTV_effRR_lower = ptv_model$penetrance$effective_penetrance_CI[1] / prevalence,
-    PTV_effRR_upper = ptv_model$penetrance$effective_penetrance_CI[2] / prevalence
+    PTV_peneff = peneff,
+    PTV_peneff_lower = peneff_ci[1],
+    PTV_peneff_upper = peneff_ci[2],
+    PTV_effRR = peneff / prevalence,
+    PTV_effRR_lower = peneff_ci[1] / prevalence,
+    PTV_effRR_upper = peneff_ci[2] / prevalence
   )
 }
 

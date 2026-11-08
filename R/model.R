@@ -444,12 +444,40 @@ effective_penetrance_func <- function(model,
       model, genetic_data, gamma_scaling_factor
     )
   }
-  effective_penetrance_from_moments(
+  value <- effective_penetrance_from_moments(
     model,
     moments,
     prevalence,
     effective_penetrance_weights(genetic_data)
   )
+  warn_effective_penetrance(value)
+  value
+}
+
+warn_effective_penetrance <- function(values, bootstrap = FALSE) {
+  nonfinite <- sum(!is.finite(values))
+  outside <- sum(is.finite(values) & (values < 0 | values > 1))
+  if (!nonfinite && !outside) return(invisible(NULL))
+  context <- if (bootstrap) "Bootstrap effective penetrance" else "Effective penetrance"
+  warning(
+    context, ": ", outside, " value(s) outside [0,1] and ",
+    nonfinite, " non-finite value(s). The excess-weighted ratio can be unstable ",
+    "near the null; broad effect-size support can also give values above 1. ",
+    "Estimates are not clipped.",
+    if (bootstrap && nonfinite > 0) {
+      " The effective-penetrance CI will not be calculated."
+    } else "",
+    call. = FALSE
+  )
+  invisible(NULL)
+}
+
+effective_penetrance_interval <- function(values) {
+  warn_effective_penetrance(values, bootstrap = TRUE)
+  if (all(is.finite(values))) {
+    return(stats::quantile(values, c(0.025, 0.975)))
+  }
+  c("2.5%" = NA_real_, "97.5%" = NA_real_)
 }
 
 validate_fit_input_data <- function(fit, input_data) {

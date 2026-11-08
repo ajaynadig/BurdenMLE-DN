@@ -316,20 +316,32 @@ inspect_model_artifact <- function(path, artifact, require_status = TRUE) {
 }
 
 repository_state <- function(repo_dir) {
-  commit <- tryCatch(
-    system2("git", c("-C", repo_dir, "rev-parse", "HEAD"),
-            stdout = TRUE, stderr = FALSE),
-    error = function(e) character()
-  )
-  dirty <- tryCatch(
-    system2("git", c("-C", repo_dir, "status", "--porcelain",
-                     "--untracked-files=no"), stdout = TRUE, stderr = FALSE),
-    error = function(e) character()
-  )
-  if (length(commit) != 1L || !nzchar(commit)) {
-    stop("Could not determine the repository commit.", call. = FALSE)
+  unavailable <- list(commit = NA_character_, tracked_dirty = NA,
+                      git_available = FALSE)
+  repo_dir <- normalizePath(repo_dir, mustWork = TRUE)
+  # A source archive nested beneath another checkout must not inherit its Git ID.
+  if (!file.exists(file.path(repo_dir, ".git")) || !nzchar(Sys.which("git"))) {
+    return(unavailable)
   }
-  list(commit = unname(commit), tracked_dirty = length(dirty) > 0L)
+  git_output <- function(args) {
+    result <- tryCatch(
+      suppressWarnings(system2("git", c("-C", shQuote(repo_dir), args),
+                               stdout = TRUE, stderr = FALSE)),
+      error = function(e) NULL
+    )
+    if (!is.null(attr(result, "status"))) return(NULL)
+    result
+  }
+  top <- git_output(c("rev-parse", "--show-toplevel"))
+  if (length(top) != 1L ||
+      !identical(normalizePath(top, mustWork = FALSE), repo_dir)) {
+    return(unavailable)
+  }
+  commit <- git_output(c("rev-parse", "HEAD"))
+  dirty <- git_output(c("status", "--porcelain", "--untracked-files=no"))
+  if (length(commit) != 1L || !nzchar(commit) || is.null(dirty)) return(unavailable)
+  list(commit = unname(commit), tracked_dirty = length(dirty) > 0L,
+       git_available = TRUE)
 }
 
 write_model_manifest <- function(path, run_id, mode, repo_dir, settings,
@@ -393,10 +405,22 @@ read_model_manifest <- function(path) {
       !all(c("commit", "tracked_dirty") %in% names(repository))) {
     stop("Manifest repository metadata are malformed.", call. = FALSE)
   }
-  validate_character_scalar(repository$commit, "Manifest repository commit")
-  if (!is.logical(repository$tracked_dirty) ||
-      length(repository$tracked_dirty) != 1L || is.na(repository$tracked_dirty)) {
-    stop("Manifest tracked-dirty status is malformed.", call. = FALSE)
+  if (!is.null(repository$git_available) &&
+      (!is.logical(repository$git_available) ||
+       length(repository$git_available) != 1L || is.na(repository$git_available))) {
+    stop("Manifest Git-availability status is malformed.", call. = FALSE)
+  }
+  if (isFALSE(repository$git_available)) {
+    if (!identical(repository$commit, NA_character_) ||
+        !identical(repository$tracked_dirty, NA)) {
+      stop("Unavailable Git metadata must use NA fields.", call. = FALSE)
+    }
+  } else {
+    validate_character_scalar(repository$commit, "Manifest repository commit")
+    if (!is.logical(repository$tracked_dirty) ||
+        length(repository$tracked_dirty) != 1L || is.na(repository$tracked_dirty)) {
+      stop("Manifest tracked-dirty status is malformed.", call. = FALSE)
+    }
   }
   settings <- manifest$settings
   required_settings <- c(

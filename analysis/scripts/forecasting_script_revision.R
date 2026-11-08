@@ -27,6 +27,7 @@ num_iter <- as.integer(get_arg("--iterations", 100))
 n_points <- as.integer(get_arg("--points", 20))
 seed <- as.integer(get_arg("--seed", 24312342))
 cores <- as.integer(get_arg("--cores", 1))
+if (is.na(cores) || cores < 1L) stop("--cores must be a positive integer.")
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 source_files <- c(
   "BurdenMLE_DN.R", "estimate_mutvar.R", "io.R", "likelihoods.R",
@@ -134,6 +135,10 @@ tasks <- expand.grid(
   scenario = names(scenario_list),
   stringsAsFactors = FALSE
 )
+if (!is.finite(seed) || seed < 0 ||
+    seed + as.double(nrow(tasks)) * 104729 > .Machine$integer.max) {
+  stop("Forecast task seeds exceed the supported integer range.")
+}
 
 run_task <- function(task_index) {
   task <- tasks[task_index, ]
@@ -153,7 +158,9 @@ run_task <- function(task_index) {
 
 cat("Forecasting", nrow(tasks), "scenario/iteration/sample-size combinations...\n")
 if (cores > 1 && .Platform$OS.type != "windows") {
-  task_results <- parallel::mclapply(seq_len(nrow(tasks)), run_task, mc.cores = cores)
+  # Each task sets its historical seed explicitly; do not add fork RNG streams.
+  task_results <- parallel::mclapply(seq_len(nrow(tasks)), run_task,
+                                    mc.cores = cores, mc.set.seed = FALSE)
 } else {
   progress <- txtProgressBar(min = 0, max = nrow(tasks), style = 3)
   task_results <- vector("list", nrow(tasks))
@@ -162,6 +169,10 @@ if (cores > 1 && .Platform$OS.type != "windows") {
     setTxtProgressBar(progress, i)
   }
   close(progress)
+}
+if (length(task_results) != nrow(tasks) ||
+    any(!vapply(task_results, is.data.frame, logical(1)))) {
+  stop("One or more forecast workers failed; no forecast outputs were written.")
 }
 forecast_full <- do.call(rbind, task_results)
 

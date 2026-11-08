@@ -34,6 +34,7 @@ dir.create(supp_figure_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
 if (!file.exists(summary_file)) stop("Cohort/sex summary not found: ", summary_file)
 dataset_mutvar_results <- readRDS(summary_file)
+cohort_table_dir <- table_dir
 
 # Creates cohort_table_panel and panels B-F using the manuscript ggplot code.
 source(file.path(example_dir, "make_figure2_main_autism.R"))
@@ -112,6 +113,6 @@ dataset_fraccase_revision <- ggplot(
 cohort_only_figure <- dataset_mutvar_revision | dataset_fraccase_revision
 ggsave(file.path(supp_figure_dir, "SupplementaryFigure10_CohortHeterogeneity.pdf"),
        cohort_only_figure, device = cairo_pdf, width = 8, height = 4)
-write.table(dataset_mutvar_results, file.path(table_dir, "cohort_sex_summary.tsv"),
+write.table(dataset_mutvar_results, file.path(cohort_table_dir, "cohort_sex_summary.tsv"),
             sep = "\t", quote = FALSE, row.names = FALSE)
 cat("Full manuscript-style Figure 2 written to", figure_dir, "\n")

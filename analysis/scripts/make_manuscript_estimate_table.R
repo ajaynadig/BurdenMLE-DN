@@ -683,7 +683,7 @@ paternal_combined <- one_row(
 add_row(
   "Results", "Population and clinical genetic characterization",
   "Paternal-age-associated mutational-variance change",
-  "Combined PTV + Mis2",
+  "SPARK PTV + Mis2; prevalence 2.76%",
   -paternal_combined$absolute_change,
   unit = "absolute mutational variance",
   manuscript_ready = paste0(
@@ -693,7 +693,7 @@ add_row(
   manuscript_snapshot = "upward bias of 0.00019",
   source_file = paternal_bias_file,
   source_key = "Combined PTV + Mis2",
-  notes = "Magnitude is reported as upward bias; the sensitivity table stores the downward correction."
+  notes = "Magnitude is reported as upward bias; the scalar sensitivity uses corrected SPARK prevalence and PTV indel scaling. The 2024 natality reference is contemporary, not birth-year-matched."
 )
 add_row(
   "Results", "Population and clinical genetic characterization",
@@ -713,21 +713,19 @@ add_row(
   source_key = "Autism, 1% prevalence",
   notes = "Paired gene-bootstrap interval."
 )
-add_row(
-  "Results", "Population and clinical genetic characterization",
-  "Spearman correlation with TADA Bayes factor",
-  "Posterior-mean PTV rate ratio",
-  tada$estimate[grepl("posterior mean", tada$statistic)],
-  unit = "Spearman rho",
-  manuscript_ready = paste0(
-    "Spearman’s ρ = ",
-    format_plain(tada$estimate[grepl("posterior mean", tada$statistic)], 2)
-  ),
-  manuscript_snapshot = "positively correlated",
-  status = "optional_add_numeric_result",
-  source_file = tada_file,
-  source_key = "posterior mean vs BF_PTV"
-)
+if (!"subset" %in% names(tada)) tada$subset <- "All genes"
+for (i in which(grepl("posterior mean", tada$statistic))) {
+  add_row(
+    "Results", "Population and clinical genetic characterization",
+    "Spearman correlation with TADA Bayes factor", tada$subset[i],
+    tada$estimate[i], unit = "Spearman rho",
+    manuscript_ready = paste0("Spearman’s ρ = ", format_plain(tada$estimate[i], 3),
+                             "; n = ", format(tada$n[i], big.mark = ",")),
+    manuscript_snapshot = "positively correlated", status = "update_value",
+    source_file = tada_file, source_key = paste(tada$subset[i], "posterior mean vs BF_PTV"),
+    notes = "Same-data consistency check; p_PTV is a nominal, unadjusted subset filter, not the plotted quantity."
+  )
+}
 add_row(
   "Results", "Population and clinical genetic characterization",
   "Korean WGS affected-offspring sample size", "Kim et al.",
@@ -1031,6 +1029,28 @@ add_row(
   source_file = paired_combined_file,
   source_key = "DD / Autism primary"
 )
+ddd_ptv_gene_count_rr5 <- one_row(
+  autism_dd_genes,
+  diagnosis == "DD" & threshold == 5
+)
+add_row(
+  "Results", "Comparison with severe developmental disorders",
+  "Number of PTV-associated developmental-disorder genes", "RR > 5",
+  ddd_ptv_gene_count_rr5$estimate,
+  ddd_ptv_gene_count_rr5$lower,
+  ddd_ptv_gene_count_rr5$upper,
+  unit = "genes",
+  manuscript_ready = format_count_ci(
+    ddd_ptv_gene_count_rr5$estimate,
+    ddd_ptv_gene_count_rr5$lower,
+    ddd_ptv_gene_count_rr5$upper
+  ),
+  manuscript_snapshot = "a few hundred genes",
+  status = "replace_qualitative_value_with_CI",
+  source_file = autism_dd_genes_file,
+  source_key = "DD; threshold=5",
+  notes = "Interval for the estimated total number of genes."
+)
 ddd_rr5 <- one_row(
   autism_dd_fraction,
   diagnosis == "DD" & threshold == 5
@@ -1074,6 +1094,23 @@ add_row(
   status = if (overlap_n == 3543) "matches" else "update_value",
   source_file = overlap_pedigree_file,
   source_key = "unique Sample with In_Kaplanis=1"
+)
+overlap_total <- overlap_n + cohort_n[["DDD"]]
+stopifnot(overlap_n == 3543, cohort_n[["DDD"]] == 1194, overlap_total == 4737)
+add_row(
+  "Results", "Comparison with severe developmental disorders",
+  "Autism/DD overlapping samples", "Total excluded: GeneDx + DDD",
+  overlap_total, unit = "samples",
+  manuscript_ready = "4,737 excluded (3,543 GeneDx + 1,194 DDD)",
+  status = "update_value", source_file = main_cohort_file,
+  source_key = "DDD + GeneDx overlap pedigree", notes = "Keep 3,543 for the GeneDx-only component."
+)
+add_row(
+  "Results", "Comparison with severe developmental disorders",
+  "Autism sample size after overlap exclusion", "All retained cohorts",
+  cohort_n[["All"]] - overlap_total, unit = "samples",
+  manuscript_ready = "N = 33,943 retained", status = "update_value",
+  source_file = main_cohort_file, source_key = "All minus total overlap"
 )
 add_row(
   "Results", "Comparison with severe developmental disorders",
@@ -1219,7 +1256,7 @@ for (item in optimizer_rows) {
     source_key = "N=38680",
     notes = paste0(
       "Candidate topline diagnostic for text accompanying ",
-      "Supplementary Figure 17; 400 paired simulations."
+      "Supplementary Figure 16; 400 paired simulations."
     )
   )
 }
@@ -1246,6 +1283,10 @@ for (specification in list(
     source_key = "Analysis specification"
   )
 }
+
+# Revision summaries are part of the normal generator, not an optional external patch.
+source(file.path(repo_dir, "analysis", "scripts", "manuscript_revision_estimates.R"),
+       local = environment())
 
 incomplete_ci <- xor(
   is.finite(checklist$ci_lower),

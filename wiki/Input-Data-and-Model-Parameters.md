@@ -123,6 +123,13 @@ order for `loeuf_features()`. PTV rates cover the indicated SNV class; analyses
 that also include indels must supply a suitable indel mutation rate or scaling
 procedure for their own calling pipeline.
 
+The reference follows [Satterstrom et al. (2026), version 1](https://doi.org/10.64898/2026.08.24.26360398),
+posted 26 August 2026. Match the observed variant mask and callable exposure to
+the supplied rates; calibration alone does not correct a mismatched mask.
+The ASC de novo PTV analysis includes other-splice annotations and does not
+apply the LOFTEE HC/flag filter used for inherited and case-control PTVs.
+LOEUF annotations are from gnomAD v2.1.1; mutation-rate calibration uses gnomAD v4.1.
+
 ## Manuscript settings versus package defaults
 
 | Setting | Package default | Manuscript analysis |

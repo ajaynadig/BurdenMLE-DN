@@ -63,6 +63,10 @@ inclusive_finite_null_pvalue <- function(null_values, observed_value) {
 #'   `P(X >= observed)`. When null simulation and mutational variance are both
 #'   requested, the finite-null p-value includes ties and uses a plus-one
 #'   correction, so its minimum is `1 / (n_null + 1)`.
+#'   Effective penetrance outside `[0,1]` or non-finite produces a warning,
+#'   without clipping the estimate. This excess-weighted ratio can be unstable
+#'   near the null. Finite out-of-range bootstrap estimates are retained;
+#'   any non-finite replicate leaves both interval endpoints `NA`.
 #'
 #' @return An object of class `BurdenMLEDN_fit`. Important fields include
 #'   `delta`, `component_endpoints`, `ll`, `fit_status`,
@@ -439,25 +443,17 @@ BurdenMLE_DN <- function(input_data,
               replicate$indices, , drop = FALSE
             ]
           )
-          effective_penetrance_func(
+          effective_penetrance_from_moments(
             replicate$model,
-            replicate$genetic_data,
+            moments_boot,
             prevalence,
-            moments = moments_boot
+            effective_penetrance_weights(replicate$genetic_data)
           )
         }
       )
       names(bootstrap_peneff_ests) <- model$bootstrap_output$replicate_ids
 
-      if (all(is.finite(bootstrap_peneff_ests))) {
-        peneff_CI = quantile(bootstrap_peneff_ests,c(0.025,0.975))
-      } else {
-        warning(
-          "At least one bootstrap replicate has undefined effective penetrance; ",
-          "the effective-penetrance CI will not be calculated."
-        )
-        peneff_CI = c("2.5%" = NA_real_, "97.5%" = NA_real_)
-      }
+      peneff_CI = effective_penetrance_interval(bootstrap_peneff_ests)
     }
 
     model$penetrance = list(effective_penetrance = peneff,

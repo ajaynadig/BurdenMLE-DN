@@ -2,6 +2,10 @@
 # Rscript run_models.R --mode test
 # Rscript run_models.R --mode main --run-autism true --run-ddd false
 library(pbapply)
+library(data.table)
+library(ggplot2)
+library(patchwork)
+library(SummarizedExperiment)
 
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -13,6 +17,9 @@ script_file <- normalizePath(script_file, mustWork = TRUE)
 repo_dir <- dirname(dirname(dirname(script_file)))
 source(file.path(repo_dir, "analysis", "scripts", "run_models_cli.R"))
 source(file.path(repo_dir, "analysis", "scripts", "model_artifacts.R"))
+source(file.path(repo_dir, "analysis", "scripts", "model_jobs.R"))
+job_stage <- Sys.getenv("BURDENMLEDN_JOB_STAGE", "serial")
+if (!job_stage %in% c("serial", "prepare", "collect")) stop("Invalid BURDENMLEDN_JOB_STAGE")
 config <- parse_run_models_args(args)
 if (isTRUE(config$help)) {
   cat(run_models_help())
@@ -36,6 +43,20 @@ output_data_dir <- file.path(final_runs_dir, "outputs", "data")
 output_figure_dir <- file.path(final_runs_dir, "outputs", "figures", "diagnostics", "model_tests")
 dir.create(output_data_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(output_figure_dir, recursive = TRUE, showWarnings = FALSE)
+job_dir <- file.path(final_runs_dir, "jobs", run_date, analysis_mode)
+job_paths <- character()
+bootstrap_group <- 0L
+# Preparing writes only job specifications, never placeholder fit artifacts.
+save_model_artifact <- function(..., file) {
+  if (job_stage == "prepare") return(invisible(NULL))
+  if (file.exists(file)) stop("Refusing to overwrite model artifact: ", file)
+  objects <- as.list(substitute(list(...)))[-1L]
+  object_names <- vapply(objects, deparse, character(1))
+  tmp <- tempfile(".partial-", tmpdir = dirname(file))
+  on.exit(unlink(tmp), add = TRUE)
+  save(list = object_names, file = tmp, envir = parent.frame())
+  if (!file.rename(tmp, file)) stop("Cannot publish model artifact: ", file)
+}
 
 source_files <- c(
   "BurdenMLE_DN.R", "EM.R", "MixSQP.R", "estimate_mutvar.R", "io.R",
@@ -51,7 +72,8 @@ fit_BurdenMLE_DN_models <- function(data,
                                 max_effect_size,
                                 bootstrap_count,
                                 optimizer,
-                                genes_to_keep = rownames(data$counts)) {
+                                genes_to_keep = rownames(data$counts),
+                                bootstrap_source = NULL) {
   missing_models <- setdiff(model_names, data$loop_vars$names)
   if (length(missing_models) > 0) {
     stop("Requested models are absent from the setup: ",
@@ -65,15 +87,24 @@ fit_BurdenMLE_DN_models <- function(data,
   bootstrap_gene_ids <- rownames(data$counts)[
     rownames(data$counts) %in% genes_to_keep
   ]
-  bootstrap_samples <- matrix(
-    vapply(seq_len(bootstrap_count), function(dummy) {
-      bootstrap_gene_ids[
-        sample(seq_along(bootstrap_gene_ids), replace = TRUE)
-      ]
-    }, character(length(bootstrap_gene_ids))),
-    nrow = length(bootstrap_gene_ids),
-    ncol = bootstrap_count
-  )
+  bootstrap_group <<- bootstrap_group + 1L
+  group_seed <- as.double(random_seed) +
+    1000L * match(analysis_mode, c("main", "no_ces", "no_overlap", "age", "test")) + bootstrap_group
+  if (group_seed > .Machine$integer.max) stop("Bootstrap group seed exceeds integer range.")
+  bootstrap_samples <- if (job_stage == "collect") NULL else
+    model_job_bootstraps(bootstrap_gene_ids, bootstrap_count, as.integer(group_seed))
+  saved_draw_dir <- Sys.getenv("BURDENMLEDN_PREVIOUS_BOOTSTRAPS", "")
+  if (nzchar(saved_draw_dir) && job_stage != "collect") {
+    if (is.null(bootstrap_source)) stop("No previous-draw source assigned to this model group.")
+    saved <- readRDS(file.path(saved_draw_dir, paste0(bootstrap_source, ".rds")))
+    if (!identical(saved$gene_ids, bootstrap_gene_ids) ||
+        !identical(dim(saved$bootstrap_samples), c(length(bootstrap_gene_ids), as.integer(bootstrap_count))) ||
+        anyNA(saved$bootstrap_samples) || !all(saved$bootstrap_samples %in% bootstrap_gene_ids)) {
+      stop("Previous bootstrap draws do not match this model's ordered gene universe.")
+    }
+    bootstrap_samples <- saved$bootstrap_samples
+    message("Using exact saved bootstrap gene draws: ", bootstrap_source)
+  }
 
   fit_model_flags <- if (is.null(data$loop_vars$fit_model)) {
     rep(TRUE, length(data$loop_vars$names))
@@ -112,7 +143,7 @@ fit_BurdenMLE_DN_models <- function(data,
       features <- processed_input$features[gene_keep, ]
       print(colSums(features))
 
-      model <- BurdenMLE_DN(
+      fit_arguments <- list(
         input_data = input_df,
         component_endpoints = seq(
           0, log(max_effect_size), length.out = 10
@@ -125,6 +156,27 @@ fit_BurdenMLE_DN_models <- function(data,
         n_boot = bootstrap_count,
         optimizer = optimizer
       )
+
+      if (job_stage == "serial") {
+        model <- do.call(BurdenMLE_DN, fit_arguments)
+      } else {
+        collection <- gsub("[^A-Za-z0-9]+", "_", data$loop_vars$names[1])
+        job_path <- file.path(job_dir, sprintf("%s_cap%s_p%02d_m%03d.rds",
+                                               collection, max_effect_size, prev_factor_index, i))
+        if (job_stage == "collect") {
+          # Reuse the actual draws that produced the checkpoint. Never redraw here.
+          fit_arguments$bootstrap_samples <- readRDS(job_path)$arguments$bootstrap_samples
+          if (!identical(dim(fit_arguments$bootstrap_samples),
+                         c(length(bootstrap_gene_ids), as.integer(bootstrap_count))) ||
+              !all(fit_arguments$bootstrap_samples %in% bootstrap_gene_ids)) {
+            stop("Invalid saved bootstrap samples: ", job_path)
+          }
+        }
+        prepare_model_job(fit_arguments, data$loop_vars$names[i], job_path, repo_dir)
+        job_paths <<- c(job_paths, job_path)
+        if (job_stage == "prepare") return(NA)
+        model <- read_model_job_result(job_path, repo_dir)
+      }
 
       print(model$mutvar_output$total_mutvar)
       print(model$mutvar_output$enrichment)
@@ -139,6 +191,13 @@ fit_BurdenMLE_DN_models <- function(data,
 current_date <- run_date
 optimizer_suffix <- if (optimizer == "EM") "" else paste0("_", tolower(optimizer))
 artifact_paths <- character()
+
+setup_path <- file.path(job_dir, "setup_snapshot.rds")
+use_snapshot <- job_stage != "serial" && file.exists(setup_path)
+if (job_stage == "collect" && !use_snapshot) stop("Collection requires a prepared setup snapshot.")
+if (use_snapshot) {
+  list2env(read_model_setup(setup_path, config, repo_dir), envir = .GlobalEnv)
+} else {
 
 if ((analysis_mode == "main" && run_autism) ||
     analysis_mode %in% c("no_ces", "test")) {
@@ -157,6 +216,15 @@ if (analysis_mode == "main" && run_ddd) {
   source(file.path(repo_dir, "analysis", "scripts", "set_up_kaplanis.R"))
 }
 
+if (job_stage == "prepare") {
+  object_names <- intersect(c("autism_data", "kaplanis_data", "autism_counts",
+                              "age_phenotypes_spark", "theme_bhr_legend_gridlines"), ls(envir = .GlobalEnv))
+  atomic_job_rds(list(config = config, code = model_setup_code(repo_dir),
+                     objects = mget(object_names, envir = .GlobalEnv)), setup_path)
+  writeLines(unname(tools::md5sum(setup_path)), paste0(setup_path, ".md5"))
+}
+}
+
 if (analysis_mode == "main") {
   if (run_autism) {
     autism_model_names <- autism_data$loop_vars$names[
@@ -165,6 +233,7 @@ if (analysis_mode == "main") {
     BurdenMLE_DN_models_autism <- fit_BurdenMLE_DN_models(
       data = autism_data,
       model_names = autism_model_names,
+      bootstrap_source = "main_autism",
       prev_factor_indices = seq_along(autism_data$prev_factors),
       max_effect_size = autism_max_effect_size,
       bootstrap_count = n_bootstraps,
@@ -174,7 +243,7 @@ if (analysis_mode == "main") {
       output_data_dir,
       paste0("models_autism", optimizer_suffix, "_", current_date, ".Rdata")
     )
-    save(
+    save_model_artifact(
       BurdenMLE_DN_models_autism, autism_data,
       file = autism_artifact_path
     )
@@ -185,6 +254,7 @@ if (analysis_mode == "main") {
     BurdenMLE_DN_models_DDD <- fit_BurdenMLE_DN_models(
       data = kaplanis_data,
       model_names = kaplanis_data$loop_vars$names,
+      bootstrap_source = "main_ddd",
       prev_factor_indices = seq_along(kaplanis_data$prev_factors),
       max_effect_size = ddd_max_effect_size,
       bootstrap_count = n_bootstraps,
@@ -194,7 +264,7 @@ if (analysis_mode == "main") {
       output_data_dir,
       paste0("models_ddd", optimizer_suffix, "_", current_date, ".Rdata")
     )
-    save(
+    save_model_artifact(
       BurdenMLE_DN_models_DDD, kaplanis_data,
       file = ddd_artifact_path
     )
@@ -207,6 +277,7 @@ if (analysis_mode == "age") {
   BurdenMLE_DN_models_autism_AgePhenos <- fit_BurdenMLE_DN_models(
     data = autism_data,
     model_names = age_model_names,
+    bootstrap_source = "age",
     prev_factor_indices = 1,
     max_effect_size = autism_max_effect_size,
     bootstrap_count = n_bootstraps,
@@ -218,7 +289,7 @@ if (analysis_mode == "age") {
     output_data_dir,
     paste0("models_autism_AgePhenos", optimizer_suffix, "_", current_date, ".Rdata")
   )
-  save(
+  save_model_artifact(
     BurdenMLE_DN_models_autism_AgePhenos,
     autism_data_AgePhenos,
     autism_counts_AgePhenos,
@@ -273,6 +344,7 @@ if (analysis_mode == "no_ces") {
   BurdenMLE_DN_models_autism_noCES <- fit_BurdenMLE_DN_models(
     data = autism_data,
     model_names = no_ces_model_names,
+    bootstrap_source = "no_ces",
     prev_factor_indices = 1,
     max_effect_size = autism_max_effect_size,
     bootstrap_count = n_bootstraps,
@@ -283,7 +355,7 @@ if (analysis_mode == "no_ces") {
     output_data_dir,
     paste0("models_autism_noCES", optimizer_suffix, "_", current_date, ".Rdata")
   )
-  save(
+  save_model_artifact(
     BurdenMLE_DN_models_autism_noCES, autism_data, ces_gene_ids,
     file = no_ces_artifact_path
   )
@@ -295,6 +367,7 @@ if (analysis_mode == "no_overlap") {
   BurdenMLE_DN_models_autism_NoKaplanis <- fit_BurdenMLE_DN_models(
     data = autism_data,
     model_names = no_overlap_model_names,
+    bootstrap_source = "no_overlap",
     prev_factor_indices = seq_along(autism_data$prev_factors),
     max_effect_size = autism_max_effect_size,
     bootstrap_count = n_bootstraps,
@@ -306,7 +379,7 @@ if (analysis_mode == "no_overlap") {
     output_data_dir,
     paste0("models_autism_no_overlap", optimizer_suffix, "_", current_date, ".Rdata")
   )
-  save(
+  save_model_artifact(
     BurdenMLE_DN_models_autism_NoKaplanis,
     autism_data_NoKaplanis,
     autism_counts_NoKaplanis,
@@ -334,12 +407,13 @@ if (analysis_mode == "test") {
     output_data_dir,
     paste0("models_autism_test", optimizer_suffix, "_", current_date, ".Rdata")
   )
-  save(
+  save_model_artifact(
     BurdenMLE_DN_models_autism_test, autism_data,
     file = test_artifact_path
   )
   artifact_paths["test"] <- test_artifact_path
 
+  if (job_stage != "prepare") {
   test_summary <- mutvar_enrichment_table(
     autism_data, BurdenMLE_DN_models_autism_test
   )
@@ -390,6 +464,13 @@ if (analysis_mode == "test") {
     ),
     test_figure, device = cairo_pdf, width = 11, height = 4.5
   )
+  }
+}
+
+if (job_stage == "prepare") {
+  writeLines(job_paths, file.path(job_dir, "tasks.txt"))
+  cat("Prepared", length(job_paths), "model jobs in", job_dir, "\n")
+  quit(status = 0)
 }
 
 manifest_path <- write_model_manifest(

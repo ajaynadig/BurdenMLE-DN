@@ -1,5 +1,10 @@
 # Worked example
 
+For a public real-data example, see the installed
+`examples/kaplanis/README.md` and `run_kaplanis_public_example.R`, or the
+[source copy](../inst/examples/kaplanis/README.md). It downloads the Kaplanis
+supplementary variant table and compares PTV with synonymous mutational variance.
+
 The installed package includes a reproducible synthetic dataset.
 
 ```r

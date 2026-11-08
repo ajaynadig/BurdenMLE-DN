@@ -568,6 +568,9 @@ create_optimizer_comparison_plot <- function(paired_summary,
       geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
       geom_point(alpha = 0.45, size = 1) +
       scale_color_manual(values = distribution_colors) +
+      scale_x_continuous(breaks = scales::breaks_pretty(n = 3),
+                         labels = scales::label_number(scale = 1e-3, suffix = "k")) +
+      scale_y_continuous(breaks = scales::breaks_pretty(n = 3)) +
       coord_equal() +
       theme_bhr_legend_gridlines() +
       labs(
@@ -662,15 +665,25 @@ if (!is.null(compare_optimizer)) {
 
   pair_columns <- c("distribution", "N", "simulation_within_N")
   truth_columns <- c("true_mutvar", "true_frac_cases", "true_peneff")
+  comparison_replicates <- as.integer(get_arg("--comparison-replicates", "0"))
+  comparison_primary <- summary_df
+  if (comparison_replicates > 0L) {
+    comparison_primary <- subset(summary_df, simulation_within_N <= comparison_replicates)
+    comparison_summary <- subset(comparison_summary, simulation_within_N <= comparison_replicates)
+    if (any(table(comparison_primary$distribution, comparison_primary$N) != comparison_replicates) ||
+        any(table(comparison_summary$distribution, comparison_summary$N) != comparison_replicates)) {
+      stop("Incomplete matched optimizer comparison subset.")
+    }
+  }
   paired_summary <- merge(
-    summary_df,
+    comparison_primary,
     comparison_summary,
     by = pair_columns,
     suffixes = c(paste0("_", optimizer_label),
                  paste0("_", tolower(compare_optimizer))),
     sort = FALSE
   )
-  if (nrow(paired_summary) != nrow(summary_df) ||
+  if (nrow(paired_summary) != nrow(comparison_primary) ||
       nrow(paired_summary) != nrow(comparison_summary)) {
     stop("Optimizer result files do not contain the same simulation pairs.")
   }

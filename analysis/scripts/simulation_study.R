@@ -236,6 +236,7 @@ run_simulation <- function(distribution, params, empirical_data, empirical_featu
     # Store estimates and compact diagnostics, but not the full fitted model.
     results[[i]] <- list(
       true_effects = true_effects,
+      simulation_data_hash = digest::digest(sim_data, algo = "sha256"),
       true_mutvar = true_mutvar,
       true_frac_cases = true_frac_cases,
       true_peneff = true_peneff,
