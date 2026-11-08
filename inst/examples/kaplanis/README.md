@@ -34,12 +34,8 @@ counts. PTVs comprise the table's frameshift, stop-gained, splice-donor and
 splice-acceptor annotations. Reference rates are synonymous-calibrated SNV
 rates; an observed PTV/SNV ratio scales PTV rates to include indels.
 
-The maximum rate ratio is 250, **the same as the main developmental-disorder
-analysis**, at prevalence 1%. This public example gives approximately 7.2%
-PTV mutational variance versus approximately 6.5% in the main analysis.
-The source table and annotation/variant-mask and SNV/indel-handling differences
-mean that it is a worked example, not an exact reproduction of the manuscript
-input pipeline; the difference is not due to a different maximum rate ratio.
+This public example gives approximately 7.2%
+PTV mutational variance versus approximately 6.5% in the main analysis, likely due to annotation/variant-mask and SNV/indel-handling differences.
 
 For your own counts, replace the download/counting section with a data frame
 in reference gene order containing `case_count`, per-haploid `case_rate`, and
