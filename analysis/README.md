@@ -40,6 +40,7 @@ The CES-excluded upper-bound sweep fits ASD and DD PTV and Mis2 models at ten
 bounds (40 tasks, each with 100 bootstraps). Within each disorder, the classes
 share ordered genes and bootstrap draws. Likelihood, variance, and case fraction
 combine PTV + Mis2; effective penetrance is PTV-only for both disorders.
+PTV variance and case fractions include the same indel scaling as the main analyses.
 
 ## Run
 
